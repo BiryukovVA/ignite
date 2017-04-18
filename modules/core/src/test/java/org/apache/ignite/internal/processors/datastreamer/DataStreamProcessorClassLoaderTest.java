@@ -17,9 +17,6 @@
 
 package org.apache.ignite.internal.processors.datastreamer;
 
-import java.io.File;
-import java.net.URL;
-import java.net.URLClassLoader;
 import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteCache;
 import org.apache.ignite.IgniteDataStreamer;
@@ -31,6 +28,8 @@ import org.apache.ignite.testframework.junits.common.GridCommonAbstractTest;
  *
  */
 public class DataStreamProcessorClassLoaderTest extends GridCommonAbstractTest {
+    /** Test p2p entry processor. */
+    private static final String TEST_ENTRY_PROCESSOR = "org.apache.ignite.tests.p2p.CacheDeploymentEntryProcessor";
 
     /** {@inheritDoc} */
     @Override protected boolean isMultiJvm() {
@@ -42,35 +41,24 @@ public class DataStreamProcessorClassLoaderTest extends GridCommonAbstractTest {
      */
     @SuppressWarnings("unchecked")
     public void testClassLoading() throws Exception {
+        ClassLoader ldr = getExternalClassLoader();
+        Class processorCls = ldr.loadClass(TEST_ENTRY_PROCESSOR);
+
         try {
             Ignite grid = startGrid(0);
             startGrid(1);//Remote grid.
-            CacheEntryProcessor processor = loadCacheEntryProcessor();
+            CacheEntryProcessor processor = (CacheEntryProcessor)processorCls.newInstance();
 
-            IgniteCache<String, Long> cache = grid.getOrCreateCache("mycache");
+            IgniteCache<String, Long> cache = grid.getOrCreateCache("myCache");
             IgniteDataStreamer<Object, Object> dataLdr = grid.dataStreamer(cache.getName());
 
             dataLdr.allowOverwrite(true);
             dataLdr.receiver(StreamTransformer.from(processor));
-            dataLdr.addData("word", 1L);
+            dataLdr.addData("word", "test");
             dataLdr.close(false);
         }
         finally {
             stopAllGrids();
         }
-    }
-
-    /**
-     * @return loaded CacheEntryProcessor
-     * @throws Exception If failed.
-     */
-    private CacheEntryProcessor loadCacheEntryProcessor() throws Exception {
-        File file = new File("src/test/resources/classes");
-        URL url = file.toURI().toURL();
-        URL[] urls = new URL[] {url};
-
-        ClassLoader clsLdr = new URLClassLoader(urls);
-        Class cls = clsLdr.loadClass("CacheEntryProcessorTestImpl");
-        return (CacheEntryProcessor)cls.newInstance();
     }
 }
