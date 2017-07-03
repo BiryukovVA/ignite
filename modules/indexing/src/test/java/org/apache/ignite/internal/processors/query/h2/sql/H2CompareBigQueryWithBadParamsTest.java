@@ -41,7 +41,7 @@ public class H2CompareBigQueryWithBadParamsTest extends H2CompareBigQueryTest {
     @Override public void testBigQuery() throws Exception {
         try {
             super.testBigQuery();
-            fail("Test must fail");
+            fail("testBigQuery() must throw exception.");
         }
         catch (CacheException e) {
             assertTrue(e.getCause().getCause().getMessage().contains("Fetched result set was too large"));

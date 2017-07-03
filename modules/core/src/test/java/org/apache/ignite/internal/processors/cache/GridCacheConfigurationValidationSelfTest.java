@@ -164,6 +164,9 @@ public class GridCacheConfigurationValidationSelfTest extends GridCommonAbstract
         }
     }
 
+    /**
+     * @throws Exception If fails.
+     */
     public void testCacheAttributesValidationInSetters() throws Exception {
         CacheConfiguration cacheCfg = defaultCacheConfiguration();
 

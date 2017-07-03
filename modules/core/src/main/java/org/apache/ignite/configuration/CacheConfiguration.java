@@ -213,14 +213,16 @@ public class CacheConfiguration<K, V> extends MutableConfiguration<K, V> {
     public static final int DFLT_SQL_MERGE_TABLE_PREFETCH_SIZE = getInteger(IGNITE_SQL_MERGE_TABLE_PREFETCH_SIZE, 1024);
 
     static {
-        if (!U.isPow2(DFLT_SQL_MERGE_TABLE_PREFETCH_SIZE))
-            throw new IllegalArgumentException(IGNITE_SQL_MERGE_TABLE_PREFETCH_SIZE + " (" +
-                DFLT_SQL_MERGE_TABLE_PREFETCH_SIZE + ") must be positive and a power of 2.");
+        if (!U.isPow2(DFLT_SQL_MERGE_TABLE_PREFETCH_SIZE)) {
+            throw new IllegalArgumentException(IGNITE_SQL_MERGE_TABLE_PREFETCH_SIZE +
+                " (" + DFLT_SQL_MERGE_TABLE_PREFETCH_SIZE + ") must be positive and a power of 2.");
+        }
 
-        if (DFLT_SQL_MERGE_TABLE_PREFETCH_SIZE >= DFLT_SQL_MERGE_TABLE_MAX_SIZE)
-            throw new IllegalArgumentException(IGNITE_SQL_MERGE_TABLE_PREFETCH_SIZE + " (" +
-                DFLT_SQL_MERGE_TABLE_PREFETCH_SIZE + ") must be less than " + IGNITE_SQL_MERGE_TABLE_MAX_SIZE +
+        if (DFLT_SQL_MERGE_TABLE_PREFETCH_SIZE >= DFLT_SQL_MERGE_TABLE_MAX_SIZE) {
+            throw new IllegalArgumentException(IGNITE_SQL_MERGE_TABLE_PREFETCH_SIZE +
+                " (" + DFLT_SQL_MERGE_TABLE_PREFETCH_SIZE + ") must be less than " + IGNITE_SQL_MERGE_TABLE_MAX_SIZE +
                 " (" + DFLT_SQL_MERGE_TABLE_MAX_SIZE + ").");
+        }
     }
 
     /** Cache name. */
@@ -393,7 +395,7 @@ public class CacheConfiguration<K, V> extends MutableConfiguration<K, V> {
     /** */
     private int qryParallelism = DFLT_QUERY_PARALLELISM;
 
-    /** Maximum number of SQL result rows which can be fetched into a merge table.*/
+    /** Maximum number of SQL result rows which can be fetched into a merge table. */
     private int sqlMergeTableMaxSize = DFLT_SQL_MERGE_TABLE_MAX_SIZE;
 
     /**
@@ -1969,10 +1971,11 @@ public class CacheConfiguration<K, V> extends MutableConfiguration<K, V> {
      *  @return {@code this} for chaining.
      */
     public CacheConfiguration<K, V> setSqlMergeTableMaxSize(int sqlMergeTableMaxSize) {
-        if (this.sqlMergeTablePrefetchSize >= sqlMergeTableMaxSize)
+        if (this.sqlMergeTablePrefetchSize >= sqlMergeTableMaxSize) {
             throw new IllegalArgumentException("Cache configuration parameter sqlMergeTableMaxSize (" +
                 sqlMergeTableMaxSize + ") must be greater than sqlMergeTablePrefetchSize (" +
                 this.sqlMergeTablePrefetchSize + ").");
+        }
 
         this.sqlMergeTableMaxSize = sqlMergeTableMaxSize;
 
@@ -1997,14 +2000,16 @@ public class CacheConfiguration<K, V> extends MutableConfiguration<K, V> {
      *  @return {@code this} for chaining.
      */
     public CacheConfiguration<K, V> setSqlMergeTablePrefetchSize(int sqlMergeTablePrefetchSize) {
-        if (!U.isPow2(sqlMergeTablePrefetchSize))
+        if (!U.isPow2(sqlMergeTablePrefetchSize)) {
             throw new IllegalArgumentException("Cache configuration parameter sqlMergeTablePrefetchSize (" +
                 sqlMergeTablePrefetchSize + ") must be positive and a power of 2.");
+        }
 
-        if (sqlMergeTablePrefetchSize >= this.sqlMergeTableMaxSize)
+        if (sqlMergeTablePrefetchSize >= this.sqlMergeTableMaxSize) {
             throw new IllegalArgumentException("Cache configuration parameter sqlMergeTablePrefetchSize (" +
                 sqlMergeTablePrefetchSize + ") must be less than sqlMergeTableMaxSize (" +
                 this.sqlMergeTableMaxSize + ").");
+        }
 
         this.sqlMergeTablePrefetchSize = sqlMergeTablePrefetchSize;
 
