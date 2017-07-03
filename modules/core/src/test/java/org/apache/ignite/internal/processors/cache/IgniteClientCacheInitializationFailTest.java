@@ -236,13 +236,13 @@ public class IgniteClientCacheInitializationFailTest extends GridCommonAbstractT
 
         /** {@inheritDoc} */
         @Override public <K, V> QueryCursor<Cache.Entry<K, V>> queryDistributedSql(String schemaName, SqlQuery qry,
-            boolean keepBinary, int mainCacheId) throws IgniteCheckedException {
+            boolean keepBinary, GridCacheContext<?,?> cctx) throws IgniteCheckedException {
             return null;
         }
 
         /** {@inheritDoc} */
         @Override public FieldsQueryCursor<List<?>> queryDistributedSqlFields(String schemaName, SqlFieldsQuery qry,
-            boolean keepBinary, GridQueryCancel cancel, @Nullable Integer mainCacheId) throws IgniteCheckedException {
+            boolean keepBinary, GridQueryCancel cancel, @Nullable GridCacheContext<?,?> cctx) throws IgniteCheckedException {
             return null;
         }
 

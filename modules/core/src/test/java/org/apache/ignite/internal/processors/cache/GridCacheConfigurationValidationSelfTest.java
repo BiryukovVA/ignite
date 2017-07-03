@@ -164,6 +164,55 @@ public class GridCacheConfigurationValidationSelfTest extends GridCommonAbstract
         }
     }
 
+    public void testCacheAttributesValidationInSetters() throws Exception {
+        CacheConfiguration cacheCfg = defaultCacheConfiguration();
+
+        cacheCfg.setSqlMergeTableMaxSize(1500);
+        cacheCfg.setSqlMergeTablePrefetchSize(1024);
+
+        int exCount = 0;
+        int i = 0;
+
+        //SqlMergeTableMaxSize must be greater than SqlMergeTablePrefetchSize
+        try {
+            cacheCfg.setSqlMergeTableMaxSize(1000);
+        }
+        catch (Exception e) {
+            exCount++;
+        }
+
+        assertEquals(exCount, ++i);
+
+        //sqlMergeTablePrefetchSize must be greater than sqlMergeTableMaxSize
+        try {
+            cacheCfg.setSqlMergeTablePrefetchSize(2048);
+        }
+        catch (Exception e) {
+            exCount++;
+        }
+
+        assertEquals(exCount, ++i);
+
+        //sqlMergeTablePrefetchSize must be positive and a power of 2
+        try {
+            cacheCfg.setSqlMergeTablePrefetchSize(100);
+        }
+        catch (Exception e) {
+            exCount++;
+        }
+
+        assertEquals(exCount, ++i);
+
+        try {
+            cacheCfg.setSqlMergeTablePrefetchSize(-1024);
+        }
+        catch (Exception e) {
+            exCount++;
+        }
+
+        assertEquals(exCount, ++i);
+    }
+
     /**
      * Starts grid that will fail to start due to invalid configuration.
      *
