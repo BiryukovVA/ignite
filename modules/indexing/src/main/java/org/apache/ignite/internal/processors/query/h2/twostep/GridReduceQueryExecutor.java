@@ -517,7 +517,8 @@ public class GridReduceQueryExecutor {
         int timeoutMillis,
         GridQueryCancel cancel,
         Object[] params,
-        final int[] parts
+        final int[] parts,
+        final @Nullable GridCacheContext<?, ?> cctx
     ) {
         if (F.isEmpty(params))
             params = EMPTY_PARAMS;
@@ -629,7 +630,7 @@ public class GridReduceQueryExecutor {
                     GridMergeTable tbl;
 
                     try {
-                        tbl = createMergeTable(r.connection(), mapQry, qry.explain());
+                        tbl = createMergeTable(cctx, r.connection(), mapQry, qry.explain());
                     }
                     catch (IgniteCheckedException e) {
                         throw new IgniteException(e);
@@ -640,7 +641,7 @@ public class GridReduceQueryExecutor {
                     fakeTable(r.connection(), tblIdx++).innerTable(tbl);
                 }
                 else
-                    idx = GridMergeIndexUnsorted.createDummy(ctx);
+                    idx = GridMergeIndexUnsorted.createDummy(ctx, cctx);
 
                 // If the query has only replicated tables, we have to run it on a single node only.
                 if (!mapQry.isPartitioned()) {
@@ -791,7 +792,7 @@ public class GridReduceQueryExecutor {
 
                         try {
                             if (qry.explain())
-                                return explainPlan(r.connection(), qry, params);
+                                return explainPlan(cctx, r.connection(), qry, params);
 
                             GridCacheSqlQuery rdc = qry.reduceQuery();
 
@@ -1214,7 +1215,7 @@ public class GridReduceQueryExecutor {
      * @return Cursor for plans.
      * @throws IgniteCheckedException if failed.
      */
-    private Iterator<List<?>> explainPlan(JdbcConnection c, GridCacheTwoStepQuery qry, Object[] params)
+    private Iterator<List<?>> explainPlan(GridCacheContext<?, ?> cctx, JdbcConnection c, GridCacheTwoStepQuery qry, Object[] params)
         throws IgniteCheckedException {
         List<List<?>> lists = new ArrayList<>();
 
@@ -1228,7 +1229,7 @@ public class GridReduceQueryExecutor {
         int tblIdx = 0;
 
         for (GridCacheSqlQuery mapQry : qry.mapQueries()) {
-            GridMergeTable tbl = createMergeTable(c, mapQry, false);
+            GridMergeTable tbl = createMergeTable(cctx, c, mapQry, false);
 
             fakeTable(c, tblIdx++).innerTable(tbl);
         }
@@ -1326,7 +1327,7 @@ public class GridReduceQueryExecutor {
      * @throws IgniteCheckedException If failed.
      */
     @SuppressWarnings("unchecked")
-    private GridMergeTable createMergeTable(JdbcConnection conn, GridCacheSqlQuery qry, boolean explain)
+    private GridMergeTable createMergeTable(GridCacheContext<?, ?> cctx, JdbcConnection conn, GridCacheSqlQuery qry, boolean explain)
         throws IgniteCheckedException {
         try {
             Session ses = (Session)conn.getSession();
@@ -1368,19 +1369,19 @@ public class GridReduceQueryExecutor {
 
             if (explain) {
                 idxs.add(new GridMergeIndexUnsorted(ctx, tbl,
-                    sortedIndex ? MERGE_INDEX_SORTED : MERGE_INDEX_UNSORTED));
+                    sortedIndex ? MERGE_INDEX_SORTED : MERGE_INDEX_UNSORTED, cctx));
             }
             else if (sortedIndex) {
                 List<GridSqlSortColumn> sortCols = (List<GridSqlSortColumn>)qry.sortColumns();
 
                 GridMergeIndexSorted sortedMergeIdx = new GridMergeIndexSorted(ctx, tbl, MERGE_INDEX_SORTED,
-                    GridSqlSortColumn.toIndexColumns(tbl, sortCols));
+                    GridSqlSortColumn.toIndexColumns(tbl, sortCols), cctx);
 
                 idxs.add(GridMergeTable.createScanIndex(sortedMergeIdx));
                 idxs.add(sortedMergeIdx);
             }
             else
-                idxs.add(new GridMergeIndexUnsorted(ctx, tbl, MERGE_INDEX_UNSORTED));
+                idxs.add(new GridMergeIndexUnsorted(ctx, tbl, MERGE_INDEX_UNSORTED, cctx));
 
             tbl.indexes(idxs);
 

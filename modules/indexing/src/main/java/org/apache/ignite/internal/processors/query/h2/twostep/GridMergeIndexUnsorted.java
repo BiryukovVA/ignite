@@ -26,6 +26,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.ignite.cluster.ClusterNode;
 import org.apache.ignite.internal.GridKernalContext;
+import org.apache.ignite.internal.processors.cache.GridCacheContext;
 import org.apache.ignite.internal.processors.query.h2.opt.GridH2Cursor;
 import org.apache.ignite.internal.processors.query.h2.opt.GridH2RowFactory;
 import org.h2.engine.Session;
@@ -38,6 +39,7 @@ import org.h2.table.Column;
 import org.h2.table.IndexColumn;
 import org.h2.table.TableFilter;
 import org.h2.value.Value;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Unsorted merge index.
@@ -60,23 +62,26 @@ public final class GridMergeIndexUnsorted extends GridMergeIndex {
      * @param tbl  Table.
      * @param name Index name.
      */
-    public GridMergeIndexUnsorted(GridKernalContext ctx, GridMergeTable tbl, String name) {
-        super(ctx, tbl, name, TYPE, IndexColumn.wrap(tbl.getColumns()));
+    public GridMergeIndexUnsorted(GridKernalContext ctx,
+        GridMergeTable tbl,
+        String name,
+        @Nullable GridCacheContext<?, ?> cctx) {
+        super(ctx, tbl, name, TYPE, IndexColumn.wrap(tbl.getColumns()), cctx);
     }
 
     /**
      * @param ctx Context.
      * @return Dummy index instance.
      */
-    public static GridMergeIndexUnsorted createDummy(GridKernalContext ctx) {
-        return new GridMergeIndexUnsorted(ctx);
+    public static GridMergeIndexUnsorted createDummy(GridKernalContext ctx, GridCacheContext<?, ?> cctx) {
+        return new GridMergeIndexUnsorted(ctx, cctx);
     }
 
     /**
      * @param ctx Context.
      */
-    private GridMergeIndexUnsorted(GridKernalContext ctx) {
-        super(ctx);
+    private GridMergeIndexUnsorted(GridKernalContext ctx, GridCacheContext<?, ?> cctx) {
+        super(ctx, cctx);
     }
 
     /** {@inheritDoc} */

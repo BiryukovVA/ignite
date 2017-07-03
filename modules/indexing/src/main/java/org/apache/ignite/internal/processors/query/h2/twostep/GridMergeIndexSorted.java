@@ -32,6 +32,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.ignite.cluster.ClusterNode;
 import org.apache.ignite.internal.GridKernalContext;
+import org.apache.ignite.internal.processors.cache.GridCacheContext;
 import org.apache.ignite.internal.processors.query.h2.opt.GridH2Cursor;
 import org.apache.ignite.internal.processors.query.h2.opt.GridH2RowFactory;
 import org.apache.ignite.internal.util.typedef.F;
@@ -97,9 +98,10 @@ public final class GridMergeIndexSorted extends GridMergeIndex {
         GridKernalContext ctx,
         GridMergeTable tbl,
         String name,
-        IndexColumn[] cols
+        IndexColumn[] cols,
+        @Nullable GridCacheContext<?, ?> cctx
     ) {
-        super(ctx, tbl, name, TYPE, cols);
+        super(ctx, tbl, name, TYPE, cols, cctx);
     }
 
     /** {@inheritDoc} */

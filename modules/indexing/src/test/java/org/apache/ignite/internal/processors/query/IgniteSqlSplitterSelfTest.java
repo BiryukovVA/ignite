@@ -564,12 +564,12 @@ public class IgniteSqlSplitterSelfTest extends GridCommonAbstractTest {
      * @throws Exception If failed.
      */
     public void testSortedMergeIndex() throws Exception {
-        IgniteCache<Integer,Value> c = ignite(0).getOrCreateCache(cacheConfig("v", true,
-            Integer.class, Value.class));
+        CacheConfiguration cacheCfg = cacheConfig("v", true, Integer.class, Value.class)
+            .setSqlMergeTablePrefetchSize(8);
+
+        IgniteCache<Integer,Value> c = ignite(0).getOrCreateCache(cacheCfg);
 
         try {
-            GridTestUtils.setFieldValue(null, GridMergeIndex.class, "PREFETCH_SIZE", 8);
-
             Random rnd = new GridRandom();
 
             int cnt = 1000;
@@ -618,8 +618,6 @@ public class IgniteSqlSplitterSelfTest extends GridCommonAbstractTest {
             }
         }
         finally {
-            GridTestUtils.setFieldValue(null, GridMergeIndex.class, "PREFETCH_SIZE", 1024);
-
             c.destroy();
         }
     }

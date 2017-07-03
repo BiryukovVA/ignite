@@ -28,6 +28,7 @@ import org.apache.ignite.internal.processors.cache.distributed.near.IgniteCacheQ
 import org.apache.ignite.internal.processors.cache.distributed.near.IgniteCacheQueryStopOnCancelOrTimeoutDistributedJoinSelfTest;
 import org.apache.ignite.internal.processors.query.IgniteSqlDistributedJoinSelfTest;
 import org.apache.ignite.internal.processors.query.h2.sql.H2CompareBigQueryDistributedJoinsTest;
+import org.apache.ignite.internal.processors.query.h2.sql.H2CompareBigQueryWithBadParamsTest;
 
 /**
  *
@@ -40,6 +41,7 @@ public class IgniteDistributedJoinTestSuite extends TestSuite {
         TestSuite suite = new TestSuite("Distributed Joins Test Suite.");
 
         suite.addTestSuite(H2CompareBigQueryDistributedJoinsTest.class);
+        suite.addTestSuite(H2CompareBigQueryWithBadParamsTest.class);
         suite.addTestSuite(IgniteCacheDistributedJoinCollocatedAndNotTest.class);
         suite.addTestSuite(IgniteCacheDistributedJoinCustomAffinityMapper.class);
         suite.addTestSuite(IgniteCacheDistributedJoinNoIndexTest.class);
