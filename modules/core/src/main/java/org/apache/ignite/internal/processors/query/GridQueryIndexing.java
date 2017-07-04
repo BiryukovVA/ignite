@@ -68,12 +68,12 @@ public interface GridQueryIndexing {
      * @param schemaName Schema name.
      * @param qry Query.
      * @param keepBinary Keep binary flag.
-     * @param cctx Cache context.
+     * @param mainCacheId Main cache ID.
      * @return Cursor.
      * @throws IgniteCheckedException If failed.
      */
     public <K, V> QueryCursor<Cache.Entry<K, V>> queryDistributedSql(String schemaName, SqlQuery qry,
-        boolean keepBinary, GridCacheContext<?,?> cctx) throws IgniteCheckedException;
+        boolean keepBinary, int mainCacheId) throws IgniteCheckedException;
 
     /**
      * Parses SQL query into two step query and executes it.
@@ -82,12 +82,12 @@ public interface GridQueryIndexing {
      * @param qry Query.
      * @param keepBinary Keep binary flag.
      * @param cancel Query cancel.
-     * @param cctx Cache context.
+     * @param mainCacheId Main cache ID.
      * @return Cursor.
      * @throws IgniteCheckedException If failed.
      */
     public FieldsQueryCursor<List<?>> queryDistributedSqlFields(String schemaName, SqlFieldsQuery qry,
-        boolean keepBinary, GridQueryCancel cancel, @Nullable GridCacheContext<?,?> cctx) throws IgniteCheckedException;
+        boolean keepBinary, GridQueryCancel cancel, @Nullable Integer mainCacheId) throws IgniteCheckedException;
 
     /**
      * Perform a MERGE statement using data streamer as receiver.

@@ -78,10 +78,6 @@ import org.apache.ignite.lang.IgnitePredicate;
 import org.apache.ignite.plugin.CachePluginConfiguration;
 import org.jetbrains.annotations.Nullable;
 
-import static org.apache.ignite.IgniteSystemProperties.IGNITE_SQL_MERGE_TABLE_MAX_SIZE;
-import static org.apache.ignite.IgniteSystemProperties.IGNITE_SQL_MERGE_TABLE_PREFETCH_SIZE;
-import static org.apache.ignite.IgniteSystemProperties.getInteger;
-
 /**
  * This class defines grid cache configuration. This configuration is passed to
  * grid via {@link IgniteConfiguration#getCacheConfiguration()} method. It defines all configuration
@@ -202,28 +198,6 @@ public class CacheConfiguration<K, V> extends MutableConfiguration<K, V> {
 
     /** Default query parallelism. */
     public static final int DFLT_QUERY_PARALLELISM = 1;
-
-    /** Maximum number of SQL result rows which can be fetched into a merge table. */
-    public static final int DFLT_SQL_MERGE_TABLE_MAX_SIZE = getInteger(IGNITE_SQL_MERGE_TABLE_MAX_SIZE, 10_000);
-
-    /**
-     * Number of SQL result rows that will be fetched into a merge table
-     * at once before applying binary search for the bounds.
-     */
-    public static final int DFLT_SQL_MERGE_TABLE_PREFETCH_SIZE = getInteger(IGNITE_SQL_MERGE_TABLE_PREFETCH_SIZE, 1024);
-
-    static {
-        if (!U.isPow2(DFLT_SQL_MERGE_TABLE_PREFETCH_SIZE)) {
-            throw new IllegalArgumentException(IGNITE_SQL_MERGE_TABLE_PREFETCH_SIZE +
-                " (" + DFLT_SQL_MERGE_TABLE_PREFETCH_SIZE + ") must be positive and a power of 2.");
-        }
-
-        if (DFLT_SQL_MERGE_TABLE_PREFETCH_SIZE >= DFLT_SQL_MERGE_TABLE_MAX_SIZE) {
-            throw new IllegalArgumentException(IGNITE_SQL_MERGE_TABLE_PREFETCH_SIZE +
-                " (" + DFLT_SQL_MERGE_TABLE_PREFETCH_SIZE + ") must be less than " + IGNITE_SQL_MERGE_TABLE_MAX_SIZE +
-                " (" + DFLT_SQL_MERGE_TABLE_MAX_SIZE + ").");
-        }
-    }
 
     /** Cache name. */
     private String name;
@@ -395,15 +369,6 @@ public class CacheConfiguration<K, V> extends MutableConfiguration<K, V> {
     /** */
     private int qryParallelism = DFLT_QUERY_PARALLELISM;
 
-    /** Maximum number of SQL result rows which can be fetched into a merge table. */
-    private int sqlMergeTableMaxSize = DFLT_SQL_MERGE_TABLE_MAX_SIZE;
-
-    /**
-     * Number of SQL result rows that will be fetched into a merge table
-     * at once before applying binary search for the bounds.
-     */
-    private int sqlMergeTablePrefetchSize = DFLT_SQL_MERGE_TABLE_PREFETCH_SIZE;
-
     /** Empty constructor (all values are initialized to their defaults). */
     public CacheConfiguration() {
         /* No-op. */
@@ -491,8 +456,6 @@ public class CacheConfiguration<K, V> extends MutableConfiguration<K, V> {
         writeBehindFlushSize = cc.getWriteBehindFlushSize();
         writeBehindFlushThreadCnt = cc.getWriteBehindFlushThreadCount();
         writeSync = cc.getWriteSynchronizationMode();
-        sqlMergeTableMaxSize = cc.getSqlMergeTableMaxSize();
-        sqlMergeTablePrefetchSize = cc.getSqlMergeTablePrefetchSize();
     }
 
     /**
@@ -1947,71 +1910,6 @@ public class CacheConfiguration<K, V> extends MutableConfiguration<K, V> {
      */
     public CacheConfiguration<K, V> setQueryParallelism(int qryParallelism) {
         this.qryParallelism = qryParallelism;
-
-        return this;
-    }
-
-    /**
-     * Gets property controlling maximum number of SQL result rows which can be fetched into a merge table.
-     * If there are less rows than this threshold then multiple passes throw a table will be possible,
-     * otherwise only one pass (e.g. only result streaming is possible).
-     *
-     * @return Maximum number of SQL result rows which can be fetched into a merge table.
-     */
-    public int getSqlMergeTableMaxSize() {
-        return sqlMergeTableMaxSize;
-    }
-
-    /**
-     * Sets property controlling maximum number of SQL result rows which can be fetched into a merge table.
-     * If there are less rows than this threshold then multiple passes throw a table will be possible,
-     * otherwise only one pass (e.g. only result streaming is possible).
-     *
-     *  @param sqlMergeTableMaxSize Maximum number of SQL result rows which can be fetched into a merge table.
-     *  @return {@code this} for chaining.
-     */
-    public CacheConfiguration<K, V> setSqlMergeTableMaxSize(int sqlMergeTableMaxSize) {
-        if (this.sqlMergeTablePrefetchSize >= sqlMergeTableMaxSize) {
-            throw new IllegalArgumentException("Cache configuration parameter sqlMergeTableMaxSize (" +
-                sqlMergeTableMaxSize + ") must be greater than sqlMergeTablePrefetchSize (" +
-                this.sqlMergeTablePrefetchSize + ").");
-        }
-
-        this.sqlMergeTableMaxSize = sqlMergeTableMaxSize;
-
-        return this;
-    }
-
-    /**
-     * Gets number of SQL result rows that will be fetched into a merge table
-     * at once before applying binary search for the bounds.
-     *
-     * @return Number of SQL result rows that will be fetched into a merge table.
-     */
-    public int getSqlMergeTablePrefetchSize() {
-        return sqlMergeTablePrefetchSize;
-    }
-
-    /**
-     * Sets number of SQL result rows that will be fetched into a merge table
-     * at once before applying binary search for the bounds.
-     *
-     *  @param sqlMergeTablePrefetchSize Number of SQL result rows that will be fetched into a merge table.
-     *  @return {@code this} for chaining.
-     */
-    public CacheConfiguration<K, V> setSqlMergeTablePrefetchSize(int sqlMergeTablePrefetchSize) {
-        if (!U.isPow2(sqlMergeTablePrefetchSize)) {
-            throw new IllegalArgumentException("Cache configuration parameter sqlMergeTablePrefetchSize (" +
-                sqlMergeTablePrefetchSize + ") must be positive and a power of 2.");
-        }
-
-        if (sqlMergeTablePrefetchSize >= this.sqlMergeTableMaxSize) {
-            throw new IllegalArgumentException("Cache configuration parameter sqlMergeTablePrefetchSize (" +
-                sqlMergeTablePrefetchSize + ") must be less than sqlMergeTableMaxSize (" +
-                this.sqlMergeTableMaxSize + ").");
-        }
-
-        this.sqlMergeTablePrefetchSize = sqlMergeTablePrefetchSize;
 
         return this;
     }

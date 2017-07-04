@@ -32,7 +32,6 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.ignite.cluster.ClusterNode;
 import org.apache.ignite.internal.GridKernalContext;
-import org.apache.ignite.internal.processors.cache.GridCacheContext;
 import org.apache.ignite.internal.processors.query.h2.opt.GridH2Cursor;
 import org.apache.ignite.internal.processors.query.h2.opt.GridH2RowFactory;
 import org.apache.ignite.internal.util.typedef.F;
@@ -93,15 +92,19 @@ public final class GridMergeIndexSorted extends GridMergeIndex {
      * @param tbl Table.
      * @param name Index name,
      * @param cols Columns.
+     * @param maxFetchSize Maximum number of SQL result rows which can be fetched into a merge table.
+     * @param prefetchSize Number of SQL result rows that will be fetched into a merge table
+     * at once before applying binary search for the bounds.
      */
     public GridMergeIndexSorted(
         GridKernalContext ctx,
         GridMergeTable tbl,
         String name,
         IndexColumn[] cols,
-        @Nullable GridCacheContext<?, ?> cctx
+        int maxFetchSize,
+        int prefetchSize
     ) {
-        super(ctx, tbl, name, TYPE, cols, cctx);
+        super(ctx, tbl, name, TYPE, cols, maxFetchSize, prefetchSize);
     }
 
     /** {@inheritDoc} */

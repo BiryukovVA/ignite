@@ -26,7 +26,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.ignite.cluster.ClusterNode;
 import org.apache.ignite.internal.GridKernalContext;
-import org.apache.ignite.internal.processors.cache.GridCacheContext;
 import org.apache.ignite.internal.processors.query.h2.opt.GridH2Cursor;
 import org.apache.ignite.internal.processors.query.h2.opt.GridH2RowFactory;
 import org.h2.engine.Session;
@@ -39,7 +38,6 @@ import org.h2.table.Column;
 import org.h2.table.IndexColumn;
 import org.h2.table.TableFilter;
 import org.h2.value.Value;
-import org.jetbrains.annotations.Nullable;
 
 /**
  * Unsorted merge index.
@@ -61,27 +59,34 @@ public final class GridMergeIndexUnsorted extends GridMergeIndex {
      * @param ctx Context.
      * @param tbl  Table.
      * @param name Index name.
+     * @param maxFetchSize Maximum number of SQL result rows which can be fetched into a merge table.
+     * @param prefetchSize Number of SQL result rows that will be fetched into a merge table
+     * at once before applying binary search for the bounds.
      */
     public GridMergeIndexUnsorted(GridKernalContext ctx,
         GridMergeTable tbl,
         String name,
-        @Nullable GridCacheContext<?, ?> cctx) {
-        super(ctx, tbl, name, TYPE, IndexColumn.wrap(tbl.getColumns()), cctx);
+        int maxFetchSize,
+        int prefetchSize) {
+        super(ctx, tbl, name, TYPE, IndexColumn.wrap(tbl.getColumns()), maxFetchSize, prefetchSize);
     }
 
     /**
      * @param ctx Context.
+     * @param maxFetchSize Maximum number of SQL result rows which can be fetched into a merge table.
+     * @param prefetchSize Number of SQL result rows that will be fetched into a merge table
+     * at once before applying binary search for the bounds.
      * @return Dummy index instance.
      */
-    public static GridMergeIndexUnsorted createDummy(GridKernalContext ctx, GridCacheContext<?, ?> cctx) {
-        return new GridMergeIndexUnsorted(ctx, cctx);
+    public static GridMergeIndexUnsorted createDummy(GridKernalContext ctx, int maxFetchSize, int prefetchSize) {
+        return new GridMergeIndexUnsorted(ctx, maxFetchSize, prefetchSize);
     }
 
     /**
      * @param ctx Context.
      */
-    private GridMergeIndexUnsorted(GridKernalContext ctx, GridCacheContext<?, ?> cctx) {
-        super(ctx, cctx);
+    private GridMergeIndexUnsorted(GridKernalContext ctx, int maxFetchSize, int prefetchSize) {
+        super(ctx, maxFetchSize, prefetchSize);
     }
 
     /** {@inheritDoc} */

@@ -36,7 +36,6 @@ import javax.cache.CacheException;
 import org.apache.ignite.IgniteException;
 import org.apache.ignite.cluster.ClusterNode;
 import org.apache.ignite.internal.GridKernalContext;
-import org.apache.ignite.internal.processors.cache.GridCacheContext;
 import org.apache.ignite.internal.processors.query.h2.twostep.messages.GridQueryNextPageResponse;
 import org.apache.ignite.internal.util.typedef.F;
 import org.apache.ignite.internal.util.typedef.internal.U;
@@ -52,8 +51,6 @@ import org.h2.value.Value;
 import org.jetbrains.annotations.Nullable;
 
 import static java.util.Objects.requireNonNull;
-import static org.apache.ignite.configuration.CacheConfiguration.DFLT_SQL_MERGE_TABLE_MAX_SIZE;
-import static org.apache.ignite.configuration.CacheConfiguration.DFLT_SQL_MERGE_TABLE_PREFETCH_SIZE;
 
 /**
  * Merge index.
@@ -116,27 +113,33 @@ public abstract class GridMergeIndex extends BaseIndex {
      * @param name Index name.
      * @param type Type.
      * @param cols Columns.
-     * @param cctx Cache Context
+     * @param maxFetchSize Maximum number of SQL result rows which can be fetched into a merge table.
+     * @param prefetchSize Number of SQL result rows that will be fetched into a merge table
+     * at once before applying binary search for the bounds.
      */
     public GridMergeIndex(GridKernalContext ctx,
         GridMergeTable tbl,
         String name,
         IndexType type,
         IndexColumn[] cols,
-        @Nullable GridCacheContext<?, ?> cctx) {
-        this(ctx, cctx);
+        int maxFetchSize,
+        int prefetchSize
+    ) {
+        this(ctx, maxFetchSize, prefetchSize);
 
         initBaseIndex(tbl, 0, name, cols, type);
     }
 
     /**
      * @param ctx Context.
-     * @param cctx Cache Context.
+     * @param maxFetchSize Maximum number of SQL result rows which can be fetched into a merge table.
+     * @param prefetchSize Number of SQL result rows that will be fetched into a merge table
+     * at once before applying binary search for the bounds.
      */
-    protected GridMergeIndex(GridKernalContext ctx, @Nullable GridCacheContext<?, ?> cctx) {
+    protected GridMergeIndex(GridKernalContext ctx, int maxFetchSize, int prefetchSize) {
         this.ctx = ctx;
-        maxFetchSize = cctx != null ? cctx.config().getSqlMergeTableMaxSize() : DFLT_SQL_MERGE_TABLE_MAX_SIZE;
-        prefetchSize = cctx != null ? cctx.config().getSqlMergeTablePrefetchSize() : DFLT_SQL_MERGE_TABLE_PREFETCH_SIZE;
+        this.maxFetchSize = maxFetchSize;
+        this.prefetchSize = prefetchSize;
         fetched = new BlockList<>(prefetchSize);
     }
 

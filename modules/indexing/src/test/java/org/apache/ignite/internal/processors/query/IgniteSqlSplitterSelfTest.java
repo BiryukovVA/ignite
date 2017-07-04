@@ -564,10 +564,8 @@ public class IgniteSqlSplitterSelfTest extends GridCommonAbstractTest {
      * @throws Exception If failed.
      */
     public void testSortedMergeIndex() throws Exception {
-        CacheConfiguration cacheCfg = cacheConfig("v", true, Integer.class, Value.class)
-            .setSqlMergeTablePrefetchSize(8);
-
-        IgniteCache<Integer,Value> c = ignite(0).getOrCreateCache(cacheCfg);
+        IgniteCache<Integer,Value> c = ignite(0).getOrCreateCache(cacheConfig("v", true,
+            Integer.class, Value.class));
 
         try {
             Random rnd = new GridRandom();
@@ -581,14 +579,18 @@ public class IgniteSqlSplitterSelfTest extends GridCommonAbstractTest {
             }
 
             List<List<?>> plan = c.query(new SqlFieldsQuery(
-                "explain select snd from Value order by fst desc")).getAll();
+                "explain select snd from Value order by fst desc")
+                .setSqlMergeTablePrefetchSize(8)
+            ).getAll();
             String rdcPlan = (String)plan.get(1).get(0);
 
             assertTrue(rdcPlan.contains("merge_sorted"));
             assertTrue(rdcPlan.contains("/* index sorted */"));
 
             plan = c.query(new SqlFieldsQuery(
-                "explain select snd from Value")).getAll();
+                "explain select snd from Value")
+                .setSqlMergeTablePrefetchSize(8)
+            ).getAll();
             rdcPlan = (String)plan.get(1).get(0);
 
             assertTrue(rdcPlan.contains("merge_scan"));
@@ -598,7 +600,9 @@ public class IgniteSqlSplitterSelfTest extends GridCommonAbstractTest {
                 X.println(" --> " + i);
 
                 List<List<?>> res = c.query(new SqlFieldsQuery(
-                    "select fst from Value order by fst").setPageSize(5)
+                    "select fst from Value order by fst")
+                    .setPageSize(5)
+                    .setSqlMergeTablePrefetchSize(8)
                 ).getAll();
 
                 assertEquals(cnt, res.size());

@@ -1149,19 +1149,18 @@ public class IgniteH2Indexing implements GridQueryIndexing {
      */
     private Iterable<List<?>> runQueryTwoStep(
         final String schemaName,
-        final @Nullable GridCacheContext<?, ?> cctx,
         final GridCacheTwoStepQuery qry,
         final boolean keepCacheObj,
         final boolean enforceJoinOrder,
-        final int timeoutMillis,
+        final SqlFieldsQuery sqlFieldsQry,
         final GridQueryCancel cancel,
         final Object[] params,
         final int[] parts
     ) {
         return new Iterable<List<?>>() {
             @Override public Iterator<List<?>> iterator() {
-                return rdcQryExec.query(schemaName, qry, keepCacheObj, enforceJoinOrder, timeoutMillis, cancel, params,
-                    parts, cctx);
+                return rdcQryExec.query(schemaName, qry, keepCacheObj, enforceJoinOrder, sqlFieldsQry, cancel, params,
+                    parts);
             }
         };
     }
@@ -1169,7 +1168,7 @@ public class IgniteH2Indexing implements GridQueryIndexing {
     /** {@inheritDoc} */
     @SuppressWarnings("unchecked")
     @Override public <K, V> QueryCursor<Cache.Entry<K, V>> queryDistributedSql(String schemaName, SqlQuery qry,
-        boolean keepBinary, GridCacheContext<?, ?> cctx) {
+        boolean keepBinary, int mainCacheId) {
         String type = qry.getType();
 
         H2TableDescriptor tblDesc = tableDescriptor(schemaName, type);
@@ -1198,7 +1197,7 @@ public class IgniteH2Indexing implements GridQueryIndexing {
         if (qry.getTimeout() > 0)
             fqry.setTimeout(qry.getTimeout(), TimeUnit.MILLISECONDS);
 
-        final QueryCursor<List<?>> res = queryDistributedSqlFields(schemaName, fqry, keepBinary, null, cctx);
+        final QueryCursor<List<?>> res = queryDistributedSqlFields(schemaName, fqry, keepBinary, null, mainCacheId);
 
         final Iterable<Cache.Entry<K, V>> converted = new Iterable<Cache.Entry<K, V>>() {
             @Override public Iterator<Cache.Entry<K, V>> iterator() {
@@ -1232,7 +1231,7 @@ public class IgniteH2Indexing implements GridQueryIndexing {
 
     /** {@inheritDoc} */
     @Override public FieldsQueryCursor<List<?>> queryDistributedSqlFields(String schemaName,
-        SqlFieldsQuery qry, boolean keepBinary, GridQueryCancel cancel, @Nullable GridCacheContext<?, ?> cctx) {
+        SqlFieldsQuery qry, boolean keepBinary, GridQueryCancel cancel, @Nullable Integer mainCacheId) {
         final String sqlQry = qry.getSql();
 
         Connection c = connectionForSchema(schemaName);
@@ -1345,8 +1344,8 @@ public class IgniteH2Indexing implements GridQueryIndexing {
 
                 int tblCnt = twoStepQry.tablesCount();
 
-                if (cctx != null)
-                    caches0.add(cctx.cacheId());
+                if (mainCacheId != null)
+                    caches0.add(mainCacheId);
 
                 if (tblCnt > 0) {
                     for (QueryTable tblKey : twoStepQry.tables()) {
@@ -1404,7 +1403,7 @@ public class IgniteH2Indexing implements GridQueryIndexing {
         }
 
         QueryCursorImpl<List<?>> cursor = new QueryCursorImpl<>(
-            runQueryTwoStep(schemaName, cctx, twoStepQry, keepBinary, enforceJoinOrder, qry.getTimeout(), cancel,
+            runQueryTwoStep(schemaName, twoStepQry, keepBinary, enforceJoinOrder, qry, cancel,
                 qry.getArgs(), partitions), cancel);
 
         cursor.fieldsMeta(meta);

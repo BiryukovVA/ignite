@@ -341,6 +341,7 @@ public class DmlStatementsProcessor {
     private UpdateResult executeUpdateStatement(String schemaName, final GridCacheContext cctx,
         PreparedStatement prepStmt, SqlFieldsQuery fieldsQry, boolean loc, IndexingQueryFilter filters,
         GridQueryCancel cancel, Object[] failedKeys) throws IgniteCheckedException {
+        int mainCacheId = CU.cacheId(cctx.name());
 
         Integer errKeysPos = null;
 
@@ -368,7 +369,7 @@ public class DmlStatementsProcessor {
                 .setTimeout(fieldsQry.getTimeout(), TimeUnit.MILLISECONDS);
 
             cur = (QueryCursorImpl<List<?>>) idx.queryDistributedSqlFields(schemaName, newFieldsQry, true, cancel,
-                cctx);
+                mainCacheId);
         }
         else {
             final GridQueryFieldsResult res = idx.queryLocalSqlFields(schemaName, plan.selectQry,
