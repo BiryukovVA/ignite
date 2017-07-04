@@ -568,8 +568,6 @@ public class IgniteSqlSplitterSelfTest extends GridCommonAbstractTest {
             Integer.class, Value.class));
 
         try {
-            GridTestUtils.setFieldValue(null, GridMergeIndex.class, "PREFETCH_SIZE", 8);
-
             Random rnd = new GridRandom();
 
             int cnt = 1000;
@@ -581,14 +579,18 @@ public class IgniteSqlSplitterSelfTest extends GridCommonAbstractTest {
             }
 
             List<List<?>> plan = c.query(new SqlFieldsQuery(
-                "explain select snd from Value order by fst desc")).getAll();
+                "explain select snd from Value order by fst desc")
+                .setSqlMergeTablePrefetchSize(8)
+            ).getAll();
             String rdcPlan = (String)plan.get(1).get(0);
 
             assertTrue(rdcPlan.contains("merge_sorted"));
             assertTrue(rdcPlan.contains("/* index sorted */"));
 
             plan = c.query(new SqlFieldsQuery(
-                "explain select snd from Value")).getAll();
+                "explain select snd from Value")
+                .setSqlMergeTablePrefetchSize(8)
+            ).getAll();
             rdcPlan = (String)plan.get(1).get(0);
 
             assertTrue(rdcPlan.contains("merge_scan"));
@@ -598,7 +600,9 @@ public class IgniteSqlSplitterSelfTest extends GridCommonAbstractTest {
                 X.println(" --> " + i);
 
                 List<List<?>> res = c.query(new SqlFieldsQuery(
-                    "select fst from Value order by fst").setPageSize(5)
+                    "select fst from Value order by fst")
+                    .setPageSize(5)
+                    .setSqlMergeTablePrefetchSize(8)
                 ).getAll();
 
                 assertEquals(cnt, res.size());
@@ -618,8 +622,6 @@ public class IgniteSqlSplitterSelfTest extends GridCommonAbstractTest {
             }
         }
         finally {
-            GridTestUtils.setFieldValue(null, GridMergeIndex.class, "PREFETCH_SIZE", 1024);
-
             c.destroy();
         }
     }

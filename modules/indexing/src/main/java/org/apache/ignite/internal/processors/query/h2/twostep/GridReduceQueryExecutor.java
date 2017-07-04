@@ -45,6 +45,7 @@ import org.apache.ignite.IgniteClientDisconnectedException;
 import org.apache.ignite.IgniteException;
 import org.apache.ignite.IgniteLogger;
 import org.apache.ignite.cache.query.QueryCancelledException;
+import org.apache.ignite.cache.query.SqlFieldsQuery;
 import org.apache.ignite.cluster.ClusterNode;
 import org.apache.ignite.events.DiscoveryEvent;
 import org.apache.ignite.events.Event;
@@ -169,7 +170,7 @@ public class GridReduceQueryExecutor {
         log = ctx.log(GridReduceQueryExecutor.class);
 
         ctx.io().addMessageListener(GridTopic.TOPIC_QUERY, new GridMessageListener() {
-            @Override public void onMessage(UUID nodeId, Object msg) {
+            @Override public void onMessage(UUID nodeId, Object msg, byte plc) {
                 if (!busyLock.enterBusy())
                     return;
 
@@ -503,7 +504,7 @@ public class GridReduceQueryExecutor {
      * @param qry Query.
      * @param keepBinary Keep binary.
      * @param enforceJoinOrder Enforce join order of tables.
-     * @param timeoutMillis Timeout in milliseconds.
+     * @param sqlFieldsQry primary Query.
      * @param cancel Query cancel.
      * @param params Query parameters.
      * @param parts Partitions.
@@ -514,7 +515,7 @@ public class GridReduceQueryExecutor {
         GridCacheTwoStepQuery qry,
         boolean keepBinary,
         boolean enforceJoinOrder,
-        int timeoutMillis,
+        SqlFieldsQuery sqlFieldsQry,
         GridQueryCancel cancel,
         Object[] params,
         final int[] parts
@@ -629,7 +630,7 @@ public class GridReduceQueryExecutor {
                     GridMergeTable tbl;
 
                     try {
-                        tbl = createMergeTable(r.connection(), mapQry, qry.explain());
+                        tbl = createMergeTable(r.connection(), mapQry, qry.explain(), sqlFieldsQry);
                     }
                     catch (IgniteCheckedException e) {
                         throw new IgniteException(e);
@@ -640,7 +641,8 @@ public class GridReduceQueryExecutor {
                     fakeTable(r.connection(), tblIdx++).innerTable(tbl);
                 }
                 else
-                    idx = GridMergeIndexUnsorted.createDummy(ctx);
+                    idx = GridMergeIndexUnsorted.createDummy(ctx,  sqlFieldsQry.getSqlMergeTableMaxSize(),
+                        sqlFieldsQry.getSqlMergeTablePrefetchSize());
 
                 // If the query has only replicated tables, we have to run it on a single node only.
                 if (!mapQry.isPartitioned()) {
@@ -721,7 +723,7 @@ public class GridReduceQueryExecutor {
                     .queries(mapQrys)
                     .parameters(params)
                     .flags(flags)
-                    .timeout(timeoutMillis)
+                    .timeout(sqlFieldsQry.getTimeout())
                     .schemaName(schemaName);
 
                 if (send(nodes, req, parts == null ? null : new ExplicitPartitionsSpecializer(qryMap), false)) {
@@ -791,7 +793,7 @@ public class GridReduceQueryExecutor {
 
                         try {
                             if (qry.explain())
-                                return explainPlan(r.connection(), qry, params);
+                                return explainPlan(r.connection(), qry, params, sqlFieldsQry);
 
                             GridCacheSqlQuery rdc = qry.reduceQuery();
 
@@ -799,7 +801,7 @@ public class GridReduceQueryExecutor {
                                 rdc.query(),
                                 F.asList(rdc.parameters(params)),
                                 false, // The statement will cache some extra thread local objects.
-                                timeoutMillis,
+                                sqlFieldsQry.getTimeout(),
                                 cancel);
 
                             resIter = new H2FieldsIterator(res);
@@ -1214,7 +1216,7 @@ public class GridReduceQueryExecutor {
      * @return Cursor for plans.
      * @throws IgniteCheckedException if failed.
      */
-    private Iterator<List<?>> explainPlan(JdbcConnection c, GridCacheTwoStepQuery qry, Object[] params)
+    private Iterator<List<?>> explainPlan(JdbcConnection c, GridCacheTwoStepQuery qry, Object[] params, SqlFieldsQuery sqlFieldsQry)
         throws IgniteCheckedException {
         List<List<?>> lists = new ArrayList<>();
 
@@ -1228,7 +1230,7 @@ public class GridReduceQueryExecutor {
         int tblIdx = 0;
 
         for (GridCacheSqlQuery mapQry : qry.mapQueries()) {
-            GridMergeTable tbl = createMergeTable(c, mapQry, false);
+            GridMergeTable tbl = createMergeTable(c, mapQry, false, sqlFieldsQry);
 
             fakeTable(c, tblIdx++).innerTable(tbl);
         }
@@ -1326,7 +1328,7 @@ public class GridReduceQueryExecutor {
      * @throws IgniteCheckedException If failed.
      */
     @SuppressWarnings("unchecked")
-    private GridMergeTable createMergeTable(JdbcConnection conn, GridCacheSqlQuery qry, boolean explain)
+    private GridMergeTable createMergeTable(JdbcConnection conn, GridCacheSqlQuery qry, boolean explain, SqlFieldsQuery sqlFieldsQry)
         throws IgniteCheckedException {
         try {
             Session ses = (Session)conn.getSession();
@@ -1368,19 +1370,22 @@ public class GridReduceQueryExecutor {
 
             if (explain) {
                 idxs.add(new GridMergeIndexUnsorted(ctx, tbl,
-                    sortedIndex ? MERGE_INDEX_SORTED : MERGE_INDEX_UNSORTED));
+                    sortedIndex ? MERGE_INDEX_SORTED : MERGE_INDEX_UNSORTED,
+                    sqlFieldsQry.getSqlMergeTableMaxSize(), sqlFieldsQry.getSqlMergeTablePrefetchSize()));
             }
             else if (sortedIndex) {
                 List<GridSqlSortColumn> sortCols = (List<GridSqlSortColumn>)qry.sortColumns();
 
                 GridMergeIndexSorted sortedMergeIdx = new GridMergeIndexSorted(ctx, tbl, MERGE_INDEX_SORTED,
-                    GridSqlSortColumn.toIndexColumns(tbl, sortCols));
+                    GridSqlSortColumn.toIndexColumns(tbl, sortCols),
+                    sqlFieldsQry.getSqlMergeTableMaxSize(), sqlFieldsQry.getSqlMergeTablePrefetchSize());
 
                 idxs.add(GridMergeTable.createScanIndex(sortedMergeIdx));
                 idxs.add(sortedMergeIdx);
             }
             else
-                idxs.add(new GridMergeIndexUnsorted(ctx, tbl, MERGE_INDEX_UNSORTED));
+                idxs.add(new GridMergeIndexUnsorted(ctx, tbl, MERGE_INDEX_UNSORTED,
+                    sqlFieldsQry.getSqlMergeTableMaxSize(), sqlFieldsQry.getSqlMergeTablePrefetchSize()));
 
             tbl.indexes(idxs);
 
