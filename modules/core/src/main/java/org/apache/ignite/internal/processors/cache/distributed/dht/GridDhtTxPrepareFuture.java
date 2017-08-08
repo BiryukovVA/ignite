@@ -63,6 +63,7 @@ import org.apache.ignite.internal.processors.cache.distributed.near.GridNearTxPr
 import org.apache.ignite.internal.processors.cache.transactions.IgniteInternalTx;
 import org.apache.ignite.internal.processors.cache.transactions.IgniteTxEntry;
 import org.apache.ignite.internal.processors.cache.transactions.IgniteTxKey;
+import org.apache.ignite.internal.processors.cache.transactions.TxDeadlock;
 import org.apache.ignite.internal.processors.cache.version.GridCacheVersion;
 import org.apache.ignite.internal.processors.dr.GridDrType;
 import org.apache.ignite.internal.processors.timeout.GridTimeoutObjectAdapter;
@@ -84,8 +85,10 @@ import org.apache.ignite.internal.util.typedef.internal.CU;
 import org.apache.ignite.internal.util.typedef.internal.S;
 import org.apache.ignite.internal.util.typedef.internal.U;
 import org.apache.ignite.lang.IgniteFutureCancelledException;
+import org.apache.ignite.lang.IgniteInClosure;
 import org.apache.ignite.lang.IgniteReducer;
 import org.apache.ignite.lang.IgniteUuid;
+import org.apache.ignite.transactions.TransactionDeadlockException;
 import org.jetbrains.annotations.Nullable;
 
 import static org.apache.ignite.events.EventType.EVT_CACHE_REBALANCE_OBJECT_LOADED;
@@ -771,14 +774,45 @@ public final class GridDhtTxPrepareFuture extends GridCacheCompoundFuture<Ignite
         }
         else {
             if (REPLIED_UPD.compareAndSet(this, 0, 1)) {
-                GridNearTxPrepareResponse res = createPrepareResponse(this.err);
+                final GridNearTxPrepareResponse res = createPrepareResponse(this.err);
 
                 try {
                     sendPrepareResponse(res);
                 }
                 finally {
-                    // Will call super.onDone().
-                    onComplete(res);
+                    if (cctx.tm().deadlockDetectionEnabled() && tx.nearNodeId().equals(cctx.localNodeId()) &&
+                        res.error() instanceof IgniteTxTimeoutCheckedException) {
+                        Set<IgniteTxKey> keys = new HashSet<>();
+
+                        for (IgniteTxEntry txEntry : tx.allEntries()) {
+                            if (!txEntry.locked())
+                                keys.add(txEntry.txKey());
+                        }
+
+                        IgniteInternalFuture<TxDeadlock> fut = cctx.tm().detectDeadlock(tx, keys);
+
+                        fut.listen(new IgniteInClosure<IgniteInternalFuture<TxDeadlock>>() {
+                            @Override public void apply(IgniteInternalFuture<TxDeadlock> fut) {
+                                try {
+                                    TxDeadlock deadlock = fut.get();
+
+                                    if (deadlock != null) {
+                                        GridDhtTxPrepareFuture.this.err.
+                                            addSuppressed(new TransactionDeadlockException(deadlock.toString(cctx)));
+                                    }
+                                }
+                                catch (IgniteCheckedException e) {
+                                    GridDhtTxPrepareFuture.this.err.addSuppressed(e);
+
+                                    U.warn(log, "Failed to detect deadlock.", e);
+                                }
+
+                                onComplete(res);
+                            }
+                        });
+                    }
+                    else
+                        onComplete(res); // Will call super.onDone().
                 }
 
                 return true;
