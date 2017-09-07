@@ -2130,7 +2130,7 @@ public class IgniteTxManager extends GridCacheSharedManagerAdapter {
             for (IgniteTxEntry txEntry : txEntries) {
                 IgniteTxKey txKey = txEntry.txKey();
 
-                if (res.txLocks(txKey) == null) {
+                if (!hasLocks(res, txKey)) {
                     GridCacheMapEntry e = (GridCacheMapEntry)txEntry.cached();
 
                     List<GridCacheMvccCandidate> locs = e.mvccAllLocal();
@@ -2177,6 +2177,29 @@ public class IgniteTxManager extends GridCacheSharedManagerAdapter {
         }
 
         return res;
+    }
+
+    /**
+     * @param res Response.
+     * @param txKey Tx key.
+     * @return True if {@link TxLocksResponse} contains lock with ownership {@link TxLock#OWNERSHIP_OWNER} or
+     * {@link TxLock#OWNERSHIP_CANDIDATE}.
+     */
+    private boolean hasLocks(TxLocksResponse res, IgniteTxKey txKey) {
+        TxLockList locks = res.txLocks(txKey);
+
+        if (locks == null || locks.txLocks() == null)
+            return false;
+
+        int i = 0;
+        for (TxLock lock : locks.txLocks()) {
+            if (!lock.requested())
+                i++;
+        }
+
+        System.out.println("rfvcderfvcde"+i);
+
+        return i >= 2;
     }
 
     /**
