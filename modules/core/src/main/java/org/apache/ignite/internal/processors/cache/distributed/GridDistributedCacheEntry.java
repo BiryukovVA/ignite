@@ -248,6 +248,8 @@ public class GridDistributedCacheEntry extends GridCacheMapEntry {
      * @throws GridCacheEntryRemovedException If entry was removed.
      */
     public void removeExplicitNodeLocks(UUID nodeId) throws GridCacheEntryRemovedException {
+        System.out.println("removeExplicitNodeLocks(UUID nodeId) " + cctx.localNodeId());
+
         CacheLockCandidates prev = null;
         CacheLockCandidates owner = null;
 
@@ -296,6 +298,8 @@ public class GridDistributedCacheEntry extends GridCacheMapEntry {
         CacheLockCandidates owner = null;
 
         CacheObject val;
+
+        System.out.println("removeLock() " + cctx.localNodeId());
 
         synchronized (this) {
             GridCacheMvcc mvcc = mvccExtras();
@@ -662,6 +666,10 @@ public class GridDistributedCacheEntry extends GridCacheMapEntry {
 
     /** {@inheritDoc} */
     @Override public final void txUnlock(IgniteInternalTx tx) throws GridCacheEntryRemovedException {
+        System.err.println(String.format("\nbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:\ntxNodeId=%s\nlocalNodeId=%s\nisNear=%s",
+            tx.nodeId(), cctx.localNodeId(), tx.near()));
+        U.dumpStack();
+
         removeLock(tx.xidVersion());
     }
 

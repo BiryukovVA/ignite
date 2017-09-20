@@ -399,6 +399,7 @@ public final class GridCacheMvcc {
      * @param preferLoc Whether or not to prefer local candidates.
      */
     private void remove0(GridCacheVersion ver, boolean preferLoc) {
+        System.out.println("remove0(GridCacheVersion ver, boolean preferLoc)");
         if (preferLoc) {
             if (!remove0(locs, ver))
                 remove0(rmts, ver);
@@ -421,6 +422,7 @@ public final class GridCacheMvcc {
      * @return {@code True} if candidate was removed.
      */
     private boolean remove0(Collection<GridCacheMvccCandidate> col, GridCacheVersion ver) {
+        System.out.println("remove0(Collection<GridCacheMvccCandidate> col, GridCacheVersion ver)");
         if (col != null) {
             for (Iterator<GridCacheMvccCandidate> it = col.iterator(); it.hasNext(); ) {
                 GridCacheMvccCandidate cand = it.next();

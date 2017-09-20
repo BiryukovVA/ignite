@@ -317,6 +317,8 @@ public class GridDhtCacheEntry extends GridDistributedCacheEntry {
 
     /** {@inheritDoc} */
     @Override public GridCacheMvccCandidate removeLock() {
+        System.out.println("removeLock() " + cctx.localNodeId());
+
         GridCacheMvccCandidate ret = super.removeLock();
 
         locPart.onUnlock();
@@ -326,6 +328,7 @@ public class GridDhtCacheEntry extends GridDistributedCacheEntry {
 
     /** {@inheritDoc} */
     @Override public boolean removeLock(GridCacheVersion ver) throws GridCacheEntryRemovedException {
+        System.out.println("removeLock(GridCacheVersion ver) " + cctx.localNodeId());
         boolean ret = super.removeLock(ver);
 
         locPart.onUnlock();
@@ -335,6 +338,8 @@ public class GridDhtCacheEntry extends GridDistributedCacheEntry {
 
     /** {@inheritDoc} */
     @Override public void onUnlock() {
+
+        System.out.println("onUnlock() " + cctx.localNodeId());
         locPart.onUnlock();
     }
 

@@ -36,6 +36,7 @@ import org.apache.ignite.internal.util.tostring.GridToStringInclude;
 import org.apache.ignite.internal.util.typedef.F;
 import org.apache.ignite.internal.util.typedef.internal.S;
 import org.apache.ignite.internal.util.typedef.internal.SB;
+import org.apache.ignite.internal.util.typedef.internal.U;
 import org.jetbrains.annotations.Nullable;
 
 import static org.apache.ignite.internal.processors.cache.GridCacheMvccCandidate.Mask.DHT_LOCAL;
@@ -181,6 +182,18 @@ public class GridCacheMvccCandidate implements Externalizable,
         mask(READ, read);
 
         id = IDGEN.incrementAndGet();
+
+        try {
+
+            U.dumpStack(String.format("\nyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy:\nlocal nodeId: %s.\n Nodeid: %s.\n nearloc: %s.\n dhtLoc: %s.\n threadId: %s.\n key: %s",
+                parent.context().localNodeId().toString(), nodeId, nearLoc, dhtLoc, threadId, parent.key().value(parent.context().cacheObjectContext(), false)));
+        }catch (Exception e){
+            System.out.println("wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww");
+            System.out.println("wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww");
+            e.printStackTrace(System.out);
+            System.out.println("wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww");
+            System.out.println("wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww");
+        }
     }
 
     /**

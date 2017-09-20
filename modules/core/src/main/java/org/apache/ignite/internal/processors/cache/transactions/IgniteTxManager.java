@@ -2137,7 +2137,7 @@ public class IgniteTxManager extends GridCacheSharedManagerAdapter {
             for (IgniteTxEntry txEntry : txEntries) {
                 IgniteTxKey txKey = txEntry.txKey();
 
-                if (res.txLocks(txKey) == null) {
+                if (!hasLocks(res, txKey)) {
                     GridCacheMapEntry e = (GridCacheMapEntry)txEntry.cached();
 
                     List<GridCacheMvccCandidate> locs = e.mvccAllLocal();
@@ -2168,6 +2168,53 @@ public class IgniteTxManager extends GridCacheSharedManagerAdapter {
                         }
                     }
                     // Special case for optimal sequence of nodes processing.
+                    else if (res.txLocks(txKey) == null) {
+                        if (nearTxLoc && requestedKeys != null && requestedKeys.contains(txKey)) {
+                            TxLock txLock = new TxLock(
+                                tx.nearXidVersion(),
+                                tx.nodeId(),
+                                tx.threadId(),
+                                TxLock.OWNERSHIP_REQUESTED);
+
+                            res.addTxLock(txKey, txLock);
+                        }
+                        else
+                            res.addKey(txKey);
+                    }
+                }else{
+                    StringBuilder s = new StringBuilder("ewqeqwewqewqewqewqewqewqewqewqewqewqdfasdfdfgabhsfg");
+
+                    GridCacheMapEntry e = (GridCacheMapEntry)txEntry.cached();
+
+                    List<GridCacheMvccCandidate> locs = e.mvccAllLocal();
+
+                    if (locs != null) {
+                        boolean owner = false;
+
+                        for (GridCacheMvccCandidate loc : locs) {
+                            if (!owner && loc.owner() && loc.tx())
+                                owner = true;
+
+                            if (!owner) // Skip all candidates in case when no tx that owns lock.
+                                break;
+
+                            if (loc.tx()) {
+                                UUID nearNodeId = loc.otherNodeId();
+
+                                GridCacheVersion txId = loc.otherVersion();
+
+                                TxLock txLock = new TxLock(
+                                    txId == null ? loc.version() : txId,
+                                    nearNodeId == null ? loc.nodeId() : nearNodeId,
+                                    loc.threadId(),
+                                    loc.owner() ? TxLock.OWNERSHIP_OWNER : TxLock.OWNERSHIP_CANDIDATE);
+
+                                s.append("\n").append(txKey).append(" : ")
+                                    .append(txLock.owner() ? "owner" : "candidate");
+                            }
+                        }
+                    }
+                    // Special case for optimal sequence of nodes processing.
                     else if (nearTxLoc && requestedKeys != null && requestedKeys.contains(txKey)) {
                         TxLock txLock = new TxLock(
                             tx.nearXidVersion(),
@@ -2175,15 +2222,41 @@ public class IgniteTxManager extends GridCacheSharedManagerAdapter {
                             tx.threadId(),
                             TxLock.OWNERSHIP_REQUESTED);
 
-                        res.addTxLock(txKey, txLock);
+                        //res.addTxLock(txKey, txLock);
+                        s.append("\n").append(txKey).append(" : ").append("requested");
                     }
                     else
-                        res.addKey(txKey);
+                        s.append("\n").append(txKey);
+
+                    if (s.length() > 51){
+                        String locNodeId = cctx.localNodeId().toString();
+                        System.out.println(s.append(" ").append(locNodeId.substring(locNodeId.length() - 1)));
+                    }
                 }
             }
         }
 
         return res;
+    }
+
+    /**
+     * @param res Response.
+     * @param txKey Tx key.
+     * @return True if {@link TxLocksResponse} contains lock with ownership {@link TxLock#OWNERSHIP_OWNER} or
+     * {@link TxLock#OWNERSHIP_CANDIDATE}.
+     */
+    private boolean hasLocks(TxLocksResponse res, IgniteTxKey txKey) {
+        TxLockList locks = res.txLocks(txKey);
+
+        if (locks == null || locks.txLocks() == null)
+            return false;
+
+        for (TxLock lock : locks.txLocks()) {
+            if (!lock.requested())
+                return true;
+        }
+
+        return false;
     }
 
     /**
@@ -2563,6 +2636,26 @@ public class IgniteTxManager extends GridCacheSharedManagerAdapter {
                     TxLocksRequest req = (TxLocksRequest)msg;
 
                     TxLocksResponse res = txLocksInfo(req.txKeys());
+
+                    String nodeIdStr = nodeId.toString();
+                    String locNodeId = cctx.localNodeId().toString();
+
+                    StringBuilder s = new StringBuilder("DD TxLocksResponse: ")
+                        .append(nodeIdStr.substring(nodeIdStr.length() - 1))
+                        .append(" : ")
+                        .append(locNodeId.substring(locNodeId.length() - 1));
+
+
+                    for (Map.Entry<IgniteTxKey, TxLockList> entry : res.txLocks().entrySet()) {
+                        String str = entry.getKey().toString();
+                        s.append(" : key=").append(str.substring(str.indexOf("name=KeyObject") + 14,  str.indexOf("],")));
+                        for (TxLock lock : entry.getValue().txLocks())
+                            s.append(" : ").append(lock.owner() ? "owner" : lock.candiate() ? "candiate" : lock.requested() ? "requested" : "xxx");
+
+                    }
+                    System.out.println(s);
+
+
 
                     res.futureId(req.futureId());
 

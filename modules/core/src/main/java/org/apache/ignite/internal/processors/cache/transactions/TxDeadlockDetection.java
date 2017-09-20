@@ -260,6 +260,7 @@ public class TxDeadlockDetection {
 
         /** */
         private void init() {
+            System.out.println("Deadlock detection init");
             cctx.tm().addFuture(this);
 
             if (topVer == null) // Tx manager already stopped
@@ -281,8 +282,10 @@ public class TxDeadlockDetection {
 
             assert set;
 
-            if (nodeId == null || itersCnt++ >= DEADLOCK_MAX_ITERS || timedOut)
+            if (nodeId == null || itersCnt++ >= DEADLOCK_MAX_ITERS || timedOut){
+                System.out.println("\nDeadlock detection cycle is not found");
                 onDone();
+            }
             else {
                 final Set<IgniteTxKey> txKeys = pendingKeys.get(nodeId);
 
@@ -306,8 +309,10 @@ public class TxDeadlockDetection {
 
             List<GridCacheVersion> cycle = findCycle(wfg, txId);
 
-            if (cycle != null)
+            if (cycle != null) {
+                System.out.println("\nDeadlock detection cycle is found");
                 onDone(new TxDeadlock(cycle, txs, txLockedKeys, txRequestedKeys));
+            }
             else
                 map(res.keys(), res.txLocks());
         }
@@ -497,6 +502,8 @@ public class TxDeadlockDetection {
          */
         public void onResult(UUID nodeId, TxLocksResponse res) {
             boolean set = compareAndSet(nodeId, null);
+
+
 
             if (res != null && set) {
                 if (res.classError() != null) {
