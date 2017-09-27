@@ -732,7 +732,7 @@ public class GridNearOptimisticTxPrepareFuture extends GridNearOptimisticTxPrepa
     private void onTimeout() {
         if (cctx.tm().deadlockDetectionEnabled()) {
             Set<IgniteTxKey> keys = null;
-
+//TODO qwe
             if (keyLockFut != null)
                 keys = new HashSet<>(keyLockFut.lockKeys);
             else {

@@ -473,6 +473,14 @@ public class TxDeadlockDetection {
                                 wfg.put(txId, waitingTxs = new HashSet<>());
 
                             waitingTxs.add(lock.txId());
+
+                            Set<GridCacheVersion> txs = txRequestedKeys.get(e.getKey());
+
+                            if (txs == null)
+                                txRequestedKeys.put(e.getKey(), txs = new HashSet<>());
+
+                            //todo add comment
+                            txs.add(lock.txId());
                         }
 
                         continue;
