@@ -368,7 +368,7 @@ public final class GridLocalLockFuture<K, V> extends GridCacheFutureAdapter<Bool
                             log.debug("Got removed entry in onOwnerChanged method (will retry): " + cached);
 
                         // Replace old entry with new one.
-                        entries.add(i, (GridLocalCacheEntry)cache.entryEx(cached.key()));
+                        entries.set(i, (GridLocalCacheEntry)cache.entryEx(cached.key()));
                     }
                 }
             }
@@ -400,7 +400,7 @@ public final class GridLocalLockFuture<K, V> extends GridCacheFutureAdapter<Bool
                             log.debug("Got removed entry in onOwnerChanged method (will retry): " + cached);
 
                         // Replace old entry with new one.
-                        entries.add(i, (GridLocalCacheEntry)cache.entryEx(cached.key()));
+                        entries.set(i, (GridLocalCacheEntry)cache.entryEx(cached.key()));
                     }
                 }
             }
