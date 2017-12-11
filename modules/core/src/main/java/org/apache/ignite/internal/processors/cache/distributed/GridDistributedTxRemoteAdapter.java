@@ -727,7 +727,7 @@ public abstract class GridDistributedTxRemoteAdapter extends IgniteTxAdapter
                                         "(all transaction entries will be invalidated): " + CU.txString(this), ex);
 
                                     if (nodeStopping) {
-                                        U.warn(log, "Failed to commit transaction, node is stopping [tx=" + this +
+                                        U.warn(log, "Failed to commit transaction, node is stopping [tx=" + /*this +*/
                                             ", err=" + ex + ']');
                                     }
                                     else

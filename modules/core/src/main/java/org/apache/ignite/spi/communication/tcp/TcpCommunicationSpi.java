@@ -2416,7 +2416,8 @@ public class TcpCommunicationSpi extends IgniteSpiAdapter implements Communicati
 
     /** {@inheritDoc} */
     @Override public void spiStop() throws IgniteSpiException {
-        assert stopping;
+        //todo
+//        assert stopping;
 
         unregisterMBean();
 

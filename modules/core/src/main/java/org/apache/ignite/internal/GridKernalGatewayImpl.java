@@ -26,6 +26,8 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import org.apache.ignite.IgniteCheckedException;
 import org.apache.ignite.IgniteClientDisconnectedException;
+import org.apache.ignite.internal.processors.cache.GridCacheGateway;
+import org.apache.ignite.internal.processors.cache.distributed.near.GridNearTxLocal;
 import org.apache.ignite.internal.util.StripedCompositeReadWriteLock;
 import org.apache.ignite.internal.util.future.GridFutureAdapter;
 import org.apache.ignite.internal.util.future.IgniteFutureImpl;
@@ -73,6 +75,18 @@ public class GridKernalGatewayImpl implements GridKernalGateway, Serializable {
     /** {@inheritDoc} */
     @SuppressWarnings({"LockAcquiredButNotSafelyReleased", "BusyWait"})
     @Override public void readLock() throws IllegalStateException {
+        readLock0(null);
+    }
+
+    /** {@inheritDoc} */
+    @Override public void readLockOnStopping() {
+        readLock0(GridKernalState.STOPPING);
+    }
+
+    /**
+     * @param kernalState Kernal state.
+     */
+    private void readLock0(GridKernalState kernalState) throws IllegalStateException {
         if (stackTrace == null)
             stackTrace = stackTrace();
 
@@ -83,6 +97,9 @@ public class GridKernalGatewayImpl implements GridKernalGateway, Serializable {
         GridKernalState state = this.state.get();
 
         if (state != GridKernalState.STARTED) {
+            if (state == kernalState)
+                return;
+
             // Unlock just acquired lock.
             lock.unlock();
 

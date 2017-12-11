@@ -25,6 +25,7 @@ import org.apache.ignite.IgniteCheckedException;
 import org.apache.ignite.IgniteClientDisconnectedException;
 import org.apache.ignite.IgniteException;
 import org.apache.ignite.internal.IgniteInterruptedCheckedException;
+import org.apache.ignite.internal.processors.cache.distributed.near.GridNearTxLocal;
 import org.apache.ignite.internal.util.StripedCompositeReadWriteLock;
 import org.apache.ignite.internal.util.tostring.GridToStringExclude;
 import org.apache.ignite.internal.util.typedef.internal.CU;
@@ -80,10 +81,17 @@ public class GridCacheGateway<K, V> {
         State state = this.state.get();
 
         if (state != State.STARTED) {
+            if (state == State.STOPPING) {
+                GridNearTxLocal tx = ctx.tm().tx();
+
+                if(tx != null && !tx.done())
+                    return true;
+            }
+
             if (lock)
                 rwLock.readLock().unlock();
 
-            if (state == State.STOPPED) {
+            if (state == State.STOPPED || state == State.STOPPING) {
                 if (stopErr)
                     throw new IllegalStateException(new CacheStoppedException(ctx.name()));
                 else
@@ -323,12 +331,46 @@ public class GridCacheGateway<K, V> {
         }
     }
 
+
+    /**
+     *
+     */
+    public void onStopping() {
+       /* boolean interrupted = false;
+
+        while (true) {
+            try {
+                if (rwLock.writeLock().tryLock(200, TimeUnit.MILLISECONDS))
+                    break;
+                else
+                    U.sleep(200);
+            }
+            catch (IgniteInterruptedCheckedException | InterruptedException ignore) {
+                interrupted = true;
+            }
+        }
+
+        if (interrupted)
+            Thread.currentThread().interrupt();
+
+        try {*/
+//            state.set(State.STOPPING);
+            state.compareAndSet(State.STARTED, State.STOPPING);
+//        }
+//        finally {
+//            rwLock.writeLock().unlock();
+//        }
+    }
+
     /**
      *
      */
     private enum State {
         /** */
         STARTED,
+
+        /** */
+        STOPPING,
 
         /** */
         DISCONNECTED,

@@ -85,6 +85,7 @@ import org.apache.ignite.internal.processors.cache.distributed.near.GridNearAtom
 import org.apache.ignite.internal.processors.cache.distributed.near.GridNearTransactionalCache;
 import org.apache.ignite.internal.processors.cache.dr.GridCacheDrManager;
 import org.apache.ignite.internal.processors.cache.jta.CacheJtaManagerAdapter;
+import org.apache.ignite.internal.processors.cache.jta.CacheNoopJtaManager;
 import org.apache.ignite.internal.processors.cache.local.GridLocalCache;
 import org.apache.ignite.internal.processors.cache.local.atomic.GridLocalAtomicCache;
 import org.apache.ignite.internal.processors.cache.persistence.GridCacheDatabaseSharedManager;
@@ -909,13 +910,24 @@ public class GridCacheProcessor extends GridProcessorAdapter {
 
         List<? extends GridCacheSharedManager<?, ?>> sharedMgrs = sharedCtx.managers();
 
+        System.out.println("_____________________________________________________");
         for (ListIterator<? extends GridCacheSharedManager<?, ?>> it = sharedMgrs.listIterator(sharedMgrs.size());
             it.hasPrevious(); ) {
             GridCacheSharedManager<?, ?> mgr = it.previous();
 
+//            System.out.println(mgr.getClass().getSimpleName());
+//
+            /*if (mgr instanceof GridCacheMvccManager)
+                continue;*/
+
             if (mgr != exch)
                 mgr.onKernalStop(cancel);
         }
+
+        System.out.println("_____________________________________________________");
+
+        for (IgniteCacheProxy<?, ?> proxy : jCacheProxies.values())
+            proxy.context().gate().onStopping();
     }
 
     /**

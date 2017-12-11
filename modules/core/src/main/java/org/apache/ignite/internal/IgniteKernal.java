@@ -2198,8 +2198,17 @@ public class IgniteKernal implements IgniteEx, IgniteMXBean, Externalizable {
 
             // Callback component in reverse order while kernal is still functional
             // if called in the same thread, at least.
+//            System.out.println("____________________________________________________");
+//            System.out.println("____________________________________________________");
             for (ListIterator<GridComponent> it = comps.listIterator(comps.size()); it.hasPrevious(); ) {
                 GridComponent comp = it.previous();
+
+
+                /*System.out.println(comp.getClass().getSimpleName());
+
+                if(comp instanceof GridCacheProcessor)
+                    continue;*/
+
 
                 try {
                     if (!skipDaemon(comp))
@@ -2214,15 +2223,10 @@ public class IgniteKernal implements IgniteEx, IgniteMXBean, Externalizable {
                         throw e;
                 }
             }
+//            System.out.println("____________________________________________________");
+//            System.out.println("____________________________________________________");
 
-            if (starveTask != null)
-                starveTask.close();
 
-            if (metricsLogTask != null)
-                metricsLogTask.close();
-
-            if (longOpDumpTask != null)
-                longOpDumpTask.close();
 
             boolean interrupted = false;
 
@@ -2256,6 +2260,92 @@ public class IgniteKernal implements IgniteEx, IgniteMXBean, Externalizable {
             finally {
                 gw.writeUnlock();
             }
+
+            System.out.println("1111111111111111111111111111111111111111");
+
+            //todo NPE
+            IgniteInternalFuture<Boolean> future = ctx.cache().context().tm().finishTxs();
+
+            try {
+                future.get();
+            }
+            catch (IgniteCheckedException e) {
+                log.error("WTFWTFWTFWTFWTFWTFWTFWTFWTFWTFWTF", e);
+            }
+           //todo
+
+            try {
+                U.sleep(1000);
+            }
+            catch (IgniteInterruptedCheckedException e) {
+                e.printStackTrace();
+            }
+
+          /*  for (ListIterator<GridComponent> it = comps.listIterator(comps.size()); it.hasPrevious(); ) {
+                GridComponent comp = it.previous();
+
+                try {
+                    if (!skipDaemon(comp))
+                        comp.onKernalStop(true);
+                }
+                catch (Throwable e) {
+                    errOnStop = true;
+
+                    U.error(log, "Failed to pre-stop processor: " + comp, e);
+
+                    if (e instanceof Error)
+                        throw e;
+                }
+            }
+
+            try {
+                U.sleep(200);
+            }
+            catch (IgniteInterruptedCheckedException e) {
+                e.printStackTrace();
+            }*/
+
+            if (starveTask != null)
+                starveTask.close();
+
+            if (metricsLogTask != null)
+                metricsLogTask.close();
+
+            if (longOpDumpTask != null)
+                longOpDumpTask.close();
+
+            /*boolean interrupted = false;
+
+            while (true) {
+                try {
+                    if (gw.tryWriteLock(10))
+                        break;
+                }
+                catch (InterruptedException ignored) {
+                    // Preserve interrupt status & ignore.
+                    // Note that interrupted flag is cleared.
+                    interrupted = true;
+                }
+            }
+
+            if (interrupted)
+                Thread.currentThread().interrupt();
+
+            try {
+                assert gw.getState() == STARTED || gw.getState() == STARTING || gw.getState() == DISCONNECTED;
+
+                // No more kernal calls from this point on.
+                gw.setState(STOPPING);
+
+                ctx.cluster().get().clearNodeMap();
+
+                if (log.isDebugEnabled())
+                    log.debug("Grid " + (igniteInstanceName == null ? "" : '\'' + igniteInstanceName + "' ") +
+                        "is stopping.");
+            }
+            finally {
+                gw.writeUnlock();
+            }*/
 
             // Stopping cache operations.
             GridCacheProcessor cache = ctx.cache();

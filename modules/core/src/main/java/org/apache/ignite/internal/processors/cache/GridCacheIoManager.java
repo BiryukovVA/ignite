@@ -532,13 +532,17 @@ public class GridCacheIoManager extends GridCacheSharedManagerAdapter {
     /** {@inheritDoc} */
     @SuppressWarnings("BusyWait")
     @Override protected void onKernalStop0(boolean cancel) {
-        cctx.gridIO().removeMessageListener(TOPIC_CACHE);
 
-        for (Object ordTopic : cacheHandlers.orderedHandlers.keySet())
-            cctx.gridIO().removeMessageListener(ordTopic);
+        //TODO think about it.
+        if (cancel) {
+            cctx.gridIO().removeMessageListener(TOPIC_CACHE);
 
-        for (Object ordTopic : grpHandlers.orderedHandlers.keySet())
-            cctx.gridIO().removeMessageListener(ordTopic);
+            for (Object ordTopic : cacheHandlers.orderedHandlers.keySet())
+                cctx.gridIO().removeMessageListener(ordTopic);
+
+            for (Object ordTopic : grpHandlers.orderedHandlers.keySet())
+                cctx.gridIO().removeMessageListener(ordTopic);
+        }
 
         writeLock();
 
@@ -548,6 +552,13 @@ public class GridCacheIoManager extends GridCacheSharedManagerAdapter {
         finally {
             rw.writeLock().unlock();
         }
+    }
+
+    /** {@inheritDoc} */
+    @Override protected void stop0(boolean cancel) {
+        //super.stop0(cancel);
+
+
     }
 
     /**
@@ -560,13 +571,13 @@ public class GridCacheIoManager extends GridCacheSharedManagerAdapter {
     private void onMessage0(final UUID nodeId, final GridCacheMessage cacheMsg,
         final IgniteBiInClosure<UUID, GridCacheMessage> c, byte plc) {
         try {
-            if (stopping) {
+            /*if (stopping) {
                 if (log.isDebugEnabled())
                     log.debug("Received cache communication message while stopping (will ignore) [nodeId=" +
                         nodeId + ", msg=" + cacheMsg + ']');
 
                 return;
-            }
+            }*/
 
             if (depEnabled)
                 cctx.deploy().ignoreOwnership(true);

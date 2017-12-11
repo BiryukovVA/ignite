@@ -629,8 +629,10 @@ public abstract class GridManagerAdapter<T extends IgniteSpi> implements GridMan
     @Override public final void onKernalStop(boolean cancel) {
         onKernalStop0(cancel);
 
-        for (IgniteSpi spi : spis)
-            spi.onContextDestroyed();
+        if (cancel) {
+            for (IgniteSpi spi : spis)
+                spi.onContextDestroyed();
+        }
     }
 
     /** {@inheritDoc} */

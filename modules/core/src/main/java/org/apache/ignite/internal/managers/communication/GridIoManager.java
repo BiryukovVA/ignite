@@ -871,39 +871,41 @@ public class GridIoManager extends GridManagerAdapter<CommunicationSpi<Serializa
     /** {@inheritDoc} */
     @SuppressWarnings("BusyWait")
     @Override public void onKernalStop0(boolean cancel) {
-        // No more communication messages.
-        getSpi().setListener(null);
+        if (cancel) {
+            // No more communication messages.
+            getSpi().setListener(null);
 
-        boolean interrupted = false;
+            boolean interrupted = false;
 
-        // Busy wait is intentional.
-        while (true) {
+            // Busy wait is intentional.
+            while (true) {
+                try {
+                    if (busyLock.writeLock().tryLock(200, TimeUnit.MILLISECONDS))
+                        break;
+                    else
+                        Thread.sleep(200);
+                }
+                catch (InterruptedException ignore) {
+                    // Preserve interrupt status & ignore.
+                    // Note that interrupted flag is cleared.
+                    interrupted = true;
+                }
+            }
+
             try {
-                if (busyLock.writeLock().tryLock(200, TimeUnit.MILLISECONDS))
-                    break;
-                else
-                    Thread.sleep(200);
+                if (interrupted)
+                    Thread.currentThread().interrupt();
+
+                GridEventStorageManager evtMgr = ctx.event();
+
+                if (evtMgr != null && discoLsnr != null)
+                    evtMgr.removeLocalEventListener(discoLsnr);
+
+                stopping = true;
             }
-            catch (InterruptedException ignore) {
-                // Preserve interrupt status & ignore.
-                // Note that interrupted flag is cleared.
-                interrupted = true;
+            finally {
+                busyLock.writeLock().unlock();
             }
-        }
-
-        try {
-            if (interrupted)
-                Thread.currentThread().interrupt();
-
-            GridEventStorageManager evtMgr = ctx.event();
-
-            if (evtMgr != null && discoLsnr != null)
-                evtMgr.removeLocalEventListener(discoLsnr);
-
-            stopping = true;
-        }
-        finally {
-            busyLock.writeLock().unlock();
         }
     }
 

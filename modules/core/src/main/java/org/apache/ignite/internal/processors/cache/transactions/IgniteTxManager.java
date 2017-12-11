@@ -572,6 +572,34 @@ public class IgniteTxManager extends GridCacheSharedManagerAdapter {
     }
 
     /**
+     * @return
+     */
+    public IgniteInternalFuture<Boolean> finishTxs() {
+        GridCompoundFuture<IgniteInternalTx, Boolean> res =
+            new GridCompoundFuture<>(
+                new IgniteReducer<IgniteInternalTx, Boolean>() {
+                    @Override public boolean collect(IgniteInternalTx e) {
+                        return true;
+                    }
+
+                    @Override public Boolean reduce() {
+                        return true;
+                    }
+                });
+
+        for (IgniteInternalTx tx : txs()) {
+
+            System.out.println("qqqqqqqqqqqqqqqqqqq: " + tx.getClass());
+            if (tx instanceof GridNearTxLocal)
+                res.add(tx.finishFuture());
+        }
+
+        res.markInitialized();
+
+        return res;
+    }
+
+    /**
      * @param tx Transaction.
      * @param topVer Exchange version.
      * @return {@code True} if need wait transaction for exchange.

@@ -42,6 +42,7 @@ import org.apache.ignite.internal.managers.eventstorage.GridLocalEventListener;
 import org.apache.ignite.internal.processors.affinity.AffinityTopologyVersion;
 import org.apache.ignite.internal.processors.cache.distributed.GridCacheMappedVersion;
 import org.apache.ignite.internal.processors.cache.distributed.GridDistributedCacheEntry;
+import org.apache.ignite.internal.processors.cache.distributed.near.GridNearTxLocal;
 import org.apache.ignite.internal.processors.cache.transactions.IgniteInternalTx;
 import org.apache.ignite.internal.processors.cache.transactions.IgniteTxKey;
 import org.apache.ignite.internal.processors.cache.version.GridCacheVersion;
@@ -601,11 +602,15 @@ public class GridCacheMvccManager extends GridCacheSharedManagerAdapter {
      */
     private boolean onFutureAdded(IgniteInternalFuture<?> fut) {
         if (stopping) {
-            ((GridFutureAdapter)fut).onDone(stopError());
+            GridNearTxLocal tx = cctx.tm().tx();
 
-            return false;
+            if (tx == null || tx.done()) {
+                ((GridFutureAdapter)fut).onDone(stopError());
+
+                return false;
+            }
         }
-        else if (cctx.kernalContext().clientDisconnected()) {
+        if (cctx.kernalContext().clientDisconnected()) {
             ((GridFutureAdapter)fut).onDone(disconnectedError(null));
 
             return false;
