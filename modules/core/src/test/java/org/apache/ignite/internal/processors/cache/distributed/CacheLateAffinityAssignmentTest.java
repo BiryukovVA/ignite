@@ -52,6 +52,7 @@ import org.apache.ignite.configuration.DataRegionConfiguration;
 import org.apache.ignite.configuration.DataStorageConfiguration;
 import org.apache.ignite.configuration.IgniteConfiguration;
 import org.apache.ignite.events.DiscoveryEvent;
+import org.apache.ignite.internal.DiscoverySpiTestListener;
 import org.apache.ignite.internal.GridKernalContext;
 import org.apache.ignite.internal.GridNodeOrderComparator;
 import org.apache.ignite.internal.IgniteInternalFuture;
@@ -59,7 +60,7 @@ import org.apache.ignite.internal.IgniteKernal;
 import org.apache.ignite.internal.IgniteNodeAttributes;
 import org.apache.ignite.internal.TestRecordingCommunicationSpi;
 import org.apache.ignite.internal.cluster.ClusterTopologyServerNotFoundException;
-import org.apache.ignite.internal.managers.discovery.DiscoveryCustomMessage;
+import org.apache.ignite.internal.managers.discovery.IgniteDiscoverySpi;
 import org.apache.ignite.internal.processors.affinity.AffinityTopologyVersion;
 import org.apache.ignite.internal.processors.affinity.GridAffinityFunctionContextImpl;
 import org.apache.ignite.internal.processors.cache.CacheAffinityChangeMessage;
@@ -87,7 +88,6 @@ import org.apache.ignite.plugin.extensions.communication.Message;
 import org.apache.ignite.resources.IgniteInstanceResource;
 import org.apache.ignite.services.Service;
 import org.apache.ignite.services.ServiceContext;
-import org.apache.ignite.spi.discovery.DiscoverySpiCustomMessage;
 import org.apache.ignite.spi.discovery.tcp.TcpDiscoverySpi;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.TcpDiscoveryIpFinder;
 import org.apache.ignite.spi.discovery.tcp.ipfinder.vm.TcpDiscoveryVmIpFinder;
@@ -157,7 +157,7 @@ public class CacheLateAffinityAssignmentTest extends GridCommonAbstractTest {
 
         cfg.setCommunicationSpi(commSpi);
 
-        TestTcpDiscoverySpi discoSpi = new TestTcpDiscoverySpi();
+        TcpDiscoverySpi discoSpi = new TcpDiscoverySpi();
 
         discoSpi.setForceServerMode(forceSrvMode);
         discoSpi.setIpFinder(ipFinder);
@@ -673,9 +673,11 @@ public class CacheLateAffinityAssignmentTest extends GridCommonAbstractTest {
 
             checkAffinity(4, topVer(4, 0), true);
 
-            TestTcpDiscoverySpi discoSpi = (TestTcpDiscoverySpi)ignite0.configuration().getDiscoverySpi();
+            DiscoverySpiTestListener lsnr = new DiscoverySpiTestListener();
 
-            discoSpi.blockCustomEvent();
+            ((IgniteDiscoverySpi)ignite0.configuration().getDiscoverySpi()).setInternalListener(lsnr);
+
+            lsnr.blockCustomEvent(CacheAffinityChangeMessage.class);
 
             stopGrid(1);
 
@@ -686,7 +688,7 @@ public class CacheLateAffinityAssignmentTest extends GridCommonAbstractTest {
             for (IgniteInternalFuture<?> fut : futs)
                 assertFalse(fut.isDone());
 
-            discoSpi.stopBlock();
+            lsnr.stopBlockCustomEvents();
 
             checkAffinity(3, topVer(5, 0), false);
 
@@ -1408,8 +1410,10 @@ public class CacheLateAffinityAssignmentTest extends GridCommonAbstractTest {
     public void testDelayAssignmentAffinityChanged() throws Exception {
         Ignite ignite0 = startServer(0, 1);
 
-        TestTcpDiscoverySpi discoSpi0 =
-            (TestTcpDiscoverySpi)ignite0.configuration().getDiscoverySpi();
+        DiscoverySpiTestListener lsnr = new DiscoverySpiTestListener();
+
+        ((IgniteDiscoverySpi)ignite0.configuration().getDiscoverySpi()).setInternalListener(lsnr);
+
         TestRecordingCommunicationSpi commSpi0 =
             (TestRecordingCommunicationSpi)ignite0.configuration().getCommunicationSpi();
 
@@ -1417,19 +1421,19 @@ public class CacheLateAffinityAssignmentTest extends GridCommonAbstractTest {
 
         checkAffinity(2, topVer(2, 0), true);
 
-        discoSpi0.blockCustomEvent();
+        lsnr.blockCustomEvent(CacheAffinityChangeMessage.class);
 
         startServer(2, 3);
 
         checkAffinity(3, topVer(3, 0), false);
 
-        discoSpi0.waitCustomEvent();
+        lsnr.waitCustomEvent();
 
         blockSupplySend(commSpi0, CACHE_NAME1);
 
         startServer(3, 4);
 
-        discoSpi0.stopBlock();
+        lsnr.stopBlockCustomEvents();
 
         checkAffinity(4, topVer(4, 0), false);
 
@@ -1451,8 +1455,10 @@ public class CacheLateAffinityAssignmentTest extends GridCommonAbstractTest {
         try {
             Ignite ignite0 = startServer(0, 1);
 
-            TestTcpDiscoverySpi discoSpi0 =
-                (TestTcpDiscoverySpi)ignite0.configuration().getDiscoverySpi();
+            DiscoverySpiTestListener lsnr = new DiscoverySpiTestListener();
+
+            ((IgniteDiscoverySpi)ignite0.configuration().getDiscoverySpi()).setInternalListener(lsnr);
+
             TestRecordingCommunicationSpi commSpi0 =
                 (TestRecordingCommunicationSpi)ignite0.configuration().getCommunicationSpi();
 
@@ -1464,11 +1470,11 @@ public class CacheLateAffinityAssignmentTest extends GridCommonAbstractTest {
 
             checkAffinity(3, topVer(3, 1), false);
 
-            discoSpi0.blockCustomEvent();
+            lsnr.blockCustomEvent(CacheAffinityChangeMessage.class);
 
             stopNode(2, 4);
 
-            discoSpi0.waitCustomEvent();
+            lsnr.waitCustomEvent();
 
             blockSupplySend(commSpi0, CACHE_NAME1);
 
@@ -1482,7 +1488,7 @@ public class CacheLateAffinityAssignmentTest extends GridCommonAbstractTest {
 
             Thread.sleep(2_000);
 
-            discoSpi0.stopBlock();
+            lsnr.stopBlockCustomEvents();
 
             boolean started = GridTestUtils.waitForCondition(new GridAbsPredicate() {
                 @Override public boolean apply() {
@@ -1533,14 +1539,16 @@ public class CacheLateAffinityAssignmentTest extends GridCommonAbstractTest {
 
         ignite0.createCache(ccfg);
 
-        TestTcpDiscoverySpi discoSpi0 =
-            (TestTcpDiscoverySpi)ignite0.configuration().getDiscoverySpi();
+        DiscoverySpiTestListener lsnr = new DiscoverySpiTestListener();
+
+        ((IgniteDiscoverySpi)ignite0.configuration().getDiscoverySpi()).setInternalListener(lsnr);
+
         TestRecordingCommunicationSpi spi =
             (TestRecordingCommunicationSpi)ignite0.configuration().getCommunicationSpi();
 
         blockSupplySend(spi, CACHE_NAME2);
 
-        discoSpi0.blockCustomEvent();
+        lsnr.blockCustomEvent(CacheAffinityChangeMessage.class);
 
         startServer(1, 2);
 
@@ -1550,7 +1558,7 @@ public class CacheLateAffinityAssignmentTest extends GridCommonAbstractTest {
 
         spi.stopBlock();
 
-        discoSpi0.waitCustomEvent();
+        lsnr.waitCustomEvent();
 
         ignite0.destroyCache(CACHE_NAME2);
 
@@ -1560,7 +1568,7 @@ public class CacheLateAffinityAssignmentTest extends GridCommonAbstractTest {
 
         ignite0.createCache(ccfg);
 
-        discoSpi0.stopBlock();
+        lsnr.stopBlockCustomEvents();
 
         checkAffinity(3, topVer(3, 1), false);
         checkAffinity(3, topVer(3, 2), false);
@@ -2960,83 +2968,6 @@ public class CacheLateAffinityAssignmentTest extends GridCommonAbstractTest {
         /** {@inheritDoc} */
         @Override public ClusterNode serviceNode() {
             return ignite.cluster().localNode();
-        }
-    }
-
-    /**
-     *
-     */
-    static class TestTcpDiscoverySpi extends TcpDiscoverySpi {
-        /** */
-        private boolean blockCustomEvt;
-
-        /** */
-        private final Object mux = new Object();
-
-        /** */
-        private List<DiscoverySpiCustomMessage> blockedMsgs = new ArrayList<>();
-
-        /** {@inheritDoc} */
-        @Override public void sendCustomEvent(DiscoverySpiCustomMessage msg) throws IgniteException {
-            synchronized (mux) {
-                if (blockCustomEvt) {
-                    DiscoveryCustomMessage msg0 = GridTestUtils.getFieldValue(msg, "delegate");
-
-                    if (msg0 instanceof CacheAffinityChangeMessage) {
-                        log.info("Block custom message: " + msg0);
-
-                        blockedMsgs.add(msg);
-
-                        mux.notifyAll();
-
-                        return;
-                    }
-                }
-            }
-
-            super.sendCustomEvent(msg);
-        }
-
-        /**
-         *
-         */
-        public void blockCustomEvent() {
-            synchronized (mux) {
-                assert blockedMsgs.isEmpty() : blockedMsgs;
-
-                blockCustomEvt = true;
-            }
-        }
-
-        /**
-         * @throws InterruptedException If interrupted.
-         */
-        public void waitCustomEvent() throws InterruptedException {
-            synchronized (mux) {
-                while (blockedMsgs.isEmpty())
-                    mux.wait();
-            }
-        }
-
-        /**
-         *
-         */
-        public void stopBlock() {
-            List<DiscoverySpiCustomMessage> msgs;
-
-            synchronized (this) {
-                msgs = new ArrayList<>(blockedMsgs);
-
-                blockCustomEvt = false;
-
-                blockedMsgs.clear();
-            }
-
-            for (DiscoverySpiCustomMessage msg : msgs) {
-                log.info("Resend blocked message: " + msg);
-
-                super.sendCustomEvent(msg);
-            }
         }
     }
 

@@ -55,6 +55,8 @@ import org.apache.ignite.cluster.ClusterNode;
 import org.apache.ignite.configuration.AddressResolver;
 import org.apache.ignite.configuration.IgniteConfiguration;
 import org.apache.ignite.internal.IgniteInterruptedCheckedException;
+import org.apache.ignite.internal.managers.discovery.IgniteDiscoverySpi;
+import org.apache.ignite.internal.managers.discovery.IgniteDiscoverySpiInternalListener;
 import org.apache.ignite.internal.util.tostring.GridToStringExclude;
 import org.apache.ignite.internal.util.typedef.F;
 import org.apache.ignite.internal.util.typedef.X;
@@ -87,6 +89,7 @@ import org.apache.ignite.spi.discovery.DiscoverySpiCustomMessage;
 import org.apache.ignite.spi.discovery.DiscoverySpiDataExchange;
 import org.apache.ignite.spi.discovery.DiscoverySpiHistorySupport;
 import org.apache.ignite.spi.discovery.DiscoverySpiListener;
+import org.apache.ignite.spi.discovery.DiscoverySpiMutableCustomMessageSupport;
 import org.apache.ignite.spi.discovery.DiscoverySpiNodeAuthenticator;
 import org.apache.ignite.spi.discovery.DiscoverySpiOrderSupport;
 import org.apache.ignite.spi.discovery.tcp.internal.DiscoveryDataPacket;
@@ -102,6 +105,7 @@ import org.apache.ignite.spi.discovery.tcp.messages.TcpDiscoveryAuthFailedMessag
 import org.apache.ignite.spi.discovery.tcp.messages.TcpDiscoveryCheckFailedMessage;
 import org.apache.ignite.spi.discovery.tcp.messages.TcpDiscoveryDuplicateIdMessage;
 import org.apache.ignite.spi.discovery.tcp.messages.TcpDiscoveryEnsureDelivery;
+import org.apache.ignite.spi.discovery.tcp.messages.TcpDiscoveryJoinRequestMessage;
 import org.jetbrains.annotations.Nullable;
 
 import static org.apache.ignite.IgniteSystemProperties.IGNITE_CONSISTENT_ID_BY_HOST_WITHOUT_PORT;
@@ -222,7 +226,8 @@ import static org.apache.ignite.IgniteSystemProperties.getBoolean;
 @IgniteSpiMultipleInstancesSupport(true)
 @DiscoverySpiOrderSupport(true)
 @DiscoverySpiHistorySupport(true)
-public class TcpDiscoverySpi extends IgniteSpiAdapter implements DiscoverySpi {
+@DiscoverySpiMutableCustomMessageSupport(true)
+public class TcpDiscoverySpi extends IgniteSpiAdapter implements IgniteDiscoverySpi {
     /** Node attribute that is mapped to node's external addresses (value is <tt>disc.tcp.ext-addrs</tt>). */
     public static final String ATTR_EXT_ADDRS = "disc.tcp.ext-addrs";
 
@@ -402,6 +407,9 @@ public class TcpDiscoverySpi extends IgniteSpiAdapter implements DiscoverySpi {
     /** */
     protected IgniteSpiContext spiCtx;
 
+    /** */
+    private IgniteDiscoverySpiInternalListener internalLsnr;
+
     /**
      * Gets current SPI state.
      *
@@ -466,6 +474,13 @@ public class TcpDiscoverySpi extends IgniteSpiAdapter implements DiscoverySpi {
 
     /** {@inheritDoc} */
     @Override public void sendCustomEvent(DiscoverySpiCustomMessage msg) throws IgniteException {
+        IgniteDiscoverySpiInternalListener internalLsnr = this.internalLsnr;
+
+        if (internalLsnr != null) {
+            if (!internalLsnr.beforeSendCustomEvent(this, log, msg))
+                return;
+        }
+
         impl.sendCustomEvent(msg);
     }
 
@@ -1516,6 +1531,9 @@ public class TcpDiscoverySpi extends IgniteSpiAdapter implements DiscoverySpi {
         OutputStream out,
         TcpDiscoveryAbstractMessage msg,
         long timeout) throws IOException, IgniteCheckedException {
+        if (internalLsnr != null && msg instanceof TcpDiscoveryJoinRequestMessage)
+            internalLsnr.beforeJoin(locNode, log);
+
         assert sock != null;
         assert msg != null;
         assert out != null;
@@ -2074,13 +2092,29 @@ public class TcpDiscoverySpi extends IgniteSpiAdapter implements DiscoverySpi {
         return ignite().configuration().getSslContextFactory() != null;
     }
 
-    /**
-     * Force reconnect to cluster.
-     *
-     * @throws IgniteSpiException If failed.
-     */
-    public void reconnect() throws IgniteSpiException {
+    /** {@inheritDoc} */
+    public void clientReconnect() throws IgniteSpiException {
         impl.reconnect();
+    }
+
+    /** {@inheritDoc} */
+    @Override public boolean knownNode(UUID nodeId) {
+        return getNode0(nodeId) != null;
+    }
+
+    /** {@inheritDoc} */
+    @Override public boolean clientReconnectSupported() {
+        return !clientReconnectDisabled;
+    }
+
+    /** {@inheritDoc} */
+    @Override public boolean supportsCommunicationFailureResolve() {
+        return false;
+    }
+
+    /** {@inheritDoc} */
+    @Override public void resolveCommunicationFailure(ClusterNode node, Exception err) {
+        throw new UnsupportedOperationException();
     }
 
     /**
@@ -2102,6 +2136,11 @@ public class TcpDiscoverySpi extends IgniteSpiAdapter implements DiscoverySpi {
      */
     public void addSendMessageListener(IgniteInClosure<TcpDiscoveryAbstractMessage> lsnr) {
         sndMsgLsnrs.add(lsnr);
+    }
+
+    /** {@inheritDoc} */
+    @Override public void setInternalListener(IgniteDiscoverySpiInternalListener lsnr) {
+        this.internalLsnr = lsnr;
     }
 
     /**
@@ -2141,7 +2180,7 @@ public class TcpDiscoverySpi extends IgniteSpiAdapter implements DiscoverySpi {
      * <p>
      * This method is intended for test purposes only.
      */
-    protected void simulateNodeFailure() {
+    public void simulateNodeFailure() {
         impl.simulateNodeFailure();
     }
 

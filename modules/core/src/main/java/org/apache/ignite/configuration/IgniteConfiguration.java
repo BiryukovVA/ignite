@@ -480,6 +480,9 @@ public class IgniteConfiguration {
     /** Client connector configuration. */
     private ClientConnectorConfiguration cliConnCfg = ClientListenerProcessor.DFLT_CLI_CFG;
 
+    /** */
+    private CommunicationFailureResolver commFailureRslvr;
+
     /**
      * Creates valid grid configuration with all default values.
      */
@@ -506,6 +509,8 @@ public class IgniteConfiguration {
         failSpi = cfg.getFailoverSpi();
         loadBalancingSpi = cfg.getLoadBalancingSpi();
         indexingSpi = cfg.getIndexingSpi();
+
+        commFailureRslvr = cfg.getCommunicationFailureResolver();
 
         /*
          * Order alphabetically for maintenance purposes.
@@ -588,6 +593,23 @@ public class IgniteConfiguration {
         utilityCachePoolSize = cfg.getUtilityCacheThreadPoolSize();
         waitForSegOnStart = cfg.isWaitForSegmentOnStart();
         warmupClos = cfg.getWarmupClosure();
+    }
+
+    /**
+     * @return Communication failure resovler.
+     */
+    public CommunicationFailureResolver getCommunicationFailureResolver() {
+        return commFailureRslvr;
+    }
+
+    /**
+     * @param commFailureRslvr Communication failure resovler.
+     * @return {@code this} instance.
+     */
+    public IgniteConfiguration setCommunicationFailureResolver(CommunicationFailureResolver commFailureRslvr) {
+        this.commFailureRslvr = commFailureRslvr;
+
+        return this;
     }
 
     /**
