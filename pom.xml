@@ -83,6 +83,7 @@
         <module>modules/twitter</module>
         <module>modules/mqtt</module>
         <module>modules/zookeeper</module>
+        <module>modules/zk-quorum</module>
         <module>modules/hibernate-core</module>
         <module>modules/camel</module>
         <module>modules/storm</module>

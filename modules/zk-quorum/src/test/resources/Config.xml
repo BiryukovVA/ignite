@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <!-- Конфигурация бина IgniteConfiguration -->
+    <bean id="dplIgniteConfiguration" class="org.apache.ignite.configuration.IgniteConfiguration">
+        <property name="metricsLogFrequency" value="30000"/>
+        <property name="failureDetectionTimeout" value="120000"/>
+        <!--
+        Количество потоков, используемое для разгребования Future sync объектов
+        -->
+        <property name="publicThreadPoolSize" value="256"/>
+        <property name="systemThreadPoolSize" value="256"/>
+        <property name="rebalanceThreadPoolSize" value="16"/>
+        <property name="lateAffinityAssignment" value="true"/>
+        <!--  Значение по умолчанию для Apache Ignite ! -->
+        <property name="peerClassLoadingEnabled" value="true"/>
+        <property name="binaryConfiguration" ref="dplBinaryConfiguration"/>
+        <property name="communicationSpi" ref="dplTcpCommunicationSpi"/>
+        <property name="discoverySpi">
+            <bean class="org.apache.ignite.spi.discovery.zk.ZookeeperDiscoverySpi">
+                <property name="zkConnectionString" value="10.116.172.13:2181,10.116.172.14:2181,10.116.172.15:2181"/>
+                <property name="sessionTimeout" value="10000"/>
+            </bean>
+        </property>
+        <property name="connectorConfiguration" ref="dplConnectorConfiguration"/>
+        <property name="memoryConfiguration" ref="dplMemoryConfiguration"/>
+        <property name="transactionConfiguration" ref="dplTransactionConfiguration"/>
+        <property name="atomicConfiguration" ref="dplAtomicConfiguration"/>
+        <property name="persistentStoreConfiguration" ref="dplPersistentStoreConfiguration"/>
+        <property name="pluginConfigurations">
+            <list>
+                <ref bean="dplGridGainConfiguration"/>
+            </list>
+        </property>
+        <property name="communicationFailureResolver" ref="customCommunicationFailureResolver" />
+    </bean>
+    <!-- Конфигурация бина TcpCommunicationSpi -->
+    <bean id="dplTcpCommunicationSpi" class="org.apache.ignite.spi.communication.tcp.TcpCommunicationSpi">
+        <property name="sharedMemoryPort" value="-1"/>
+        <property name="connectTimeout" value="20000"/>
+        <property name="maxConnectTimeout" value="60000"/>
+        <property name="reconnectCount" value="2"/>
+        <property name="idleConnectionTimeout" value="600000"/>
+        <property name="socketWriteTimeout" value="30000"/>
+        <property name="selectorsCount" value="18"/>
+        <property name="connectionsPerNode" value="1"/>
+        <property name="messageQueueLimit" value="0"/>
+    </bean>
+    <!-- Конфигурация бина TcpDiscoverySpi -->
+    <bean id="dplDiscoverySpi" class="org.apache.ignite.spi.discovery.tcp.TcpDiscoverySpi"/>
+    <!-- Конфигурация бина BinaryConfiguration -->
+    <bean id="dplBinaryConfiguration" class="org.apache.ignite.configuration.BinaryConfiguration">
+        <property name="compactFooter" value="true"/>
+    </bean>
+    <!-- Конфигурация бина ConnectorConfiguration -->
+    <bean id="dplConnectorConfiguration" class="org.apache.ignite.configuration.ConnectorConfiguration">
+        <property name="idleTimeout" value="180000"/>
+    </bean>
+    <!-- Конфигурация бина MemoryConfiguration -->
+    <bean id="dplMemoryConfiguration" class="org.apache.ignite.configuration.MemoryConfiguration">
+        <property name="pageSize" value="#{4 * 1024}"/>
+        <property name="defaultMemoryPolicyName" value="dpl_mem_plc"/>
+        <property name="memoryPolicies">
+            <list>
+                <ref bean="dplMemoryPolicyConfiguration"/>
+            </list>
+        </property>
+    </bean>
+    <!-- Конфигурация бина MemoryPolicyConfiguration -->
+    <bean id="dplMemoryPolicyConfiguration" class="org.apache.ignite.configuration.MemoryPolicyConfiguration">
+        <property name="name" value="dpl_mem_plc"/>
+    </bean>
+    <!-- Конфигурация персистентного хранилища Ignite -->
+    <bean id="dplPersistentStoreConfiguration" class="org.apache.ignite.configuration.PersistentStoreConfiguration">
+        <!--
+        Частота репликации страниц кэшей из off-heap в персистентное хранилище в миллисекунда
+        -->
+        <property name="checkpointingFrequency" value="180000"/>
+        <property name="WalHistorySize" value="2147483647"/>
+        <property name="walSegmentSize" value="#{1024*1024*1024}"/>
+        <property name="walMode" value="LOG_ONLY"/>
+        <property name="tlbSize" value="5242880"/>
+    </bean>
+    <!-- Конфигурация бина TransactionConfiguration -->
+    <bean id="dplTransactionConfiguration" class="org.apache.ignite.configuration.TransactionConfiguration">
+        <property name="defaultTxIsolation" value="READ_COMMITTED"/>
+        <property value="300000" name="defaultTxTimeout"/>
+    </bean>
+    <!--
+    Конфигурация для атомарных последовательностей Ignite
+    -->
+    <bean id="dplAtomicConfiguration" class="org.apache.ignite.configuration.AtomicConfiguration">
+        <!-- Размер резервирования значений -->
+        <!--
+         PRB-18128 & PRB-18290 увеличено в 50 раз до прояснения ситуации с сиквенсами в гриде
+        -->
+        <property name="atomicSequenceReserveSize" value="50000"/>
+        <!--
+        Режим работы атомарных кэшей. REPLICATED - реплицируется по всему кластеру на каждый узел
+        -->
+        <property name="cacheMode" value="REPLICATED"/>
+        <!--
+        Общее количество резервных копий кэша на других узлах
+        -->
+        <property name="backups" value="3"/>
+    </bean>
+    <!-- Конфигурация плагина GridGain -->
+    <bean id="dplGridGainConfiguration" class="org.gridgain.grid.configuration.GridGainConfiguration">
+        <property name="rollingUpdatesEnabled" value="true"/>
+        <property name="snapshotConfiguration">
+            <bean class="org.gridgain.grid.configuration.SnapshotConfiguration">
+                <property name="snapshotsPath" value="/opt/pprb/server/work/snapshot"/>
+            </bean>
+        </property>
+    </bean>
+
+    <bean id="customCommunicationFailureResolver" class="org.apache.ignite.quorum.CustomCommunicationFailureResolver">
+        <constructor-arg ref="communicationFailureResolverConfiguration"/>
+    </bean>
+
+    <bean id="communicationFailureResolverConfiguration"
+          class="org.apache.ignite.quorum.CommunicationResolverConfiguration">
+        <property name="logAllLostPartitions" value="true"/>
+        <property name="threadCnt" value="1"/>
+        <property name="minNodesCnt" value="1"/>
+        <property name="preferOldNodes" value="true"/>
+    </bean>
+
+</beans>
