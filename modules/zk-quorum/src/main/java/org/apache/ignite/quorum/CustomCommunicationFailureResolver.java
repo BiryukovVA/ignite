@@ -138,7 +138,7 @@ public class CustomCommunicationFailureResolver implements CommunicationFailureR
      */
     // TODO Perhaps this method should be moved to GridDhtPartitionTopologyImpl to be called under readlock.
     private boolean containsAllPartitions(BitSet nodesBitSet, List<ClusterNode> nodes) {
-        long t1 = System.currentTimeMillis();
+//        long t1 = System.currentTimeMillis();
 
         if (!cfg.isCheckConsistency())
             return true;
@@ -161,7 +161,7 @@ public class CustomCommunicationFailureResolver implements CommunicationFailureR
         else
             return containsAllPartitionsParallel(nodesBitSet, nodes);
 
-        System.out.println("containsAllPartitions time:" + (System.currentTimeMillis() - t1));
+//        System.out.println("containsAllPartitions time:" + (System.currentTimeMillis() - t1));
         return containsAll;
     }
 
