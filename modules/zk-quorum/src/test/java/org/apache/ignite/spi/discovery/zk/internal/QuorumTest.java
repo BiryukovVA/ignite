@@ -32,9 +32,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
-import org.apache.ignite.cache.affinity.rendezvous.RendezvousAffinityFunction;
-import org.apache.ignite.quorum.CommunicationResolverConfiguration;
-import org.apache.ignite.quorum.CustomCommunicationFailureResolver;
 import org.apache.curator.test.TestingCluster;
 import org.apache.ignite.Ignite;
 import org.apache.ignite.IgniteException;
@@ -62,6 +59,8 @@ import org.apache.ignite.lang.IgniteFuture;
 import org.apache.ignite.lang.IgniteOutClosure;
 import org.apache.ignite.lang.IgnitePredicate;
 import org.apache.ignite.plugin.security.SecurityCredentials;
+import org.apache.ignite.quorum.CommunicationResolverConfiguration;
+import org.apache.ignite.quorum.CustomCommunicationFailureResolver;
 import org.apache.ignite.resources.IgniteInstanceResource;
 import org.apache.ignite.spi.IgniteSpiException;
 import org.apache.ignite.spi.discovery.DiscoverySpi;
@@ -72,8 +71,6 @@ import org.apache.ignite.spi.discovery.zk.ZookeeperDiscoverySpiTestSuite2;
 import org.apache.ignite.testframework.GridTestUtils;
 import org.apache.ignite.testframework.junits.common.GridCommonAbstractTest;
 import org.apache.zookeeper.ZkTestClientCnxnSocketNIO;
-import org.gridgain.grid.configuration.GridGainConfiguration;
-import org.gridgain.grid.configuration.SnapshotConfiguration;
 import org.jetbrains.annotations.NotNull;
 
 import static org.apache.ignite.cache.CacheWriteSynchronizationMode.FULL_SYNC;
@@ -81,6 +78,7 @@ import static org.apache.ignite.events.EventType.EVT_NODE_FAILED;
 import static org.apache.ignite.events.EventType.EVT_NODE_JOINED;
 import static org.apache.ignite.events.EventType.EVT_NODE_LEFT;
 import static org.apache.ignite.internal.IgniteNodeAttributes.ATTR_SECURITY_CREDENTIALS;
+import static org.apache.ignite.internal.processors.cache.persistence.file.FilePageStoreManager.DFLT_STORE_DIR;
 import static org.apache.ignite.spi.discovery.zk.internal.ZookeeperDiscoveryImpl.IGNITE_ZOOKEEPER_DISCOVERY_SPI_ACK_THRESHOLD;
 import static org.apache.zookeeper.ZooKeeper.ZOOKEEPER_CLIENT_CNXN_SOCKET;
 
@@ -161,12 +159,12 @@ public class QuorumTest extends GridCommonAbstractTest {
 
         IgniteConfiguration cfg = super.getConfiguration(igniteInstanceName);
 
-        cfg.setPluginConfigurations(new GridGainConfiguration()
+        /*cfg.setPluginConfigurations(new GridGainConfiguration()
             .setRollingUpdatesEnabled(false)
             .setSnapshotConfiguration(new SnapshotConfiguration()
                 .setSnapshotsPath("/home/vitaliy/Desktop/123")
             )
-        );
+        );*/
 
         if (nodeId != null)
             cfg.setNodeId(nodeId);
@@ -766,13 +764,23 @@ public class QuorumTest extends GridCommonAbstractTest {
         evts.clear();
 
         try {
-            GridTestUtils.deleteDbFiles();
+            cleanPersistenceDir();
         }
         catch (Exception e) {
             error("Failed to delete DB files: " + e, e);
         }
 
         clientThreadLoc.set(null);
+    }
+
+    /**
+     *
+     */
+    protected void cleanPersistenceDir() throws Exception {
+        U.delete(U.resolveWorkDirectory(U.defaultWorkDirectory(), "cp", false));
+        U.delete(U.resolveWorkDirectory(U.defaultWorkDirectory(), DFLT_STORE_DIR, false));
+        U.delete(U.resolveWorkDirectory(U.defaultWorkDirectory(), "marshaller", false));
+        U.delete(U.resolveWorkDirectory(U.defaultWorkDirectory(), "binary_meta", false));
     }
 
     /**

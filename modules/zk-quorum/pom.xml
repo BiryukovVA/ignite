@@ -128,22 +128,20 @@
         </dependency>-->
 
 
-        <!-- Add this dependency to use GridGain Enterprise Edition features -->
-        <dependency>
+        <!--<dependency>
             <groupId>org.gridgain</groupId>
             <artifactId>gridgain-core</artifactId>
             <version>8.3.2</version>
             <scope>test</scope>
         </dependency>
 
-        <!-- Add this dependency to use GridGain Ultimate Edition features. -->
         <dependency>
             <groupId>org.gridgain</groupId>
             <artifactId>gridgain-ultimate</artifactId>
             <version>8.3.2</version>
             <scope>test</scope>
         </dependency>
-
+-->
 
         <dependency>
             <groupId>org.mockito</groupId>
