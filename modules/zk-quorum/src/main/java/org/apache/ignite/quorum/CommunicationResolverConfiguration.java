@@ -31,6 +31,12 @@ public class CommunicationResolverConfiguration {
     /** Logger all lost partitions. */
     private boolean logAllLostPartitions;
 
+    /** Stop unresolved cluster. */
+    private boolean stopUnresolvedCluster;
+
+    /** Delete nodes with connection problems. */
+    private boolean delNodesWithConnProblems;
+
     /**
      *
      */
@@ -120,7 +126,7 @@ public class CommunicationResolverConfiguration {
      *
      */
     public Set<String> getCheckConsistencyExcludes() {
-        if(checkConsistencyExcludes == null)
+        if (checkConsistencyExcludes == null)
             return Collections.emptySet();
 
         return checkConsistencyExcludes;
@@ -171,5 +177,42 @@ public class CommunicationResolverConfiguration {
         this.logAllLostPartitions = logAllLostPartitions;
 
         return this;
+    }
+
+    /**
+     * If {@code true} stop full cluster in case of impossibility to solve communication problem.
+     *
+     * @return {@code true} if stop full cluster on unsolved communication problem.
+     */
+    public boolean isStopUnresolvedCluster() {
+        return stopUnresolvedCluster;
+    }
+
+    /**
+     * If {@code true} stop full cluster in case of impossibility to solve communication problem.
+     *
+     * @param stopUnresolvedCluster Stop unresolved cluster.
+     */
+    public CommunicationResolverConfiguration setStopUnresolvedCluster(boolean stopUnresolvedCluster) {
+        this.stopUnresolvedCluster = stopUnresolvedCluster;
+
+        return this;
+    }
+
+    /**
+     * If {@code true} delete nodes with connection problems not related to split brain.
+     * The final cluster may not be 100% optimal, this problem is np hard.
+     *
+     * @return {@code True} if delete nodes with connection problems.
+     */
+    public boolean isDelNodesWithConnProblems() {
+        return delNodesWithConnProblems;
+    }
+
+    /**
+     * @param delNodesWithConnProblems Delete nodes with connection problems.
+     */
+    public void setDelNodesWithConnProblems(boolean delNodesWithConnProblems) {
+        this.delNodesWithConnProblems = delNodesWithConnProblems;
     }
 }

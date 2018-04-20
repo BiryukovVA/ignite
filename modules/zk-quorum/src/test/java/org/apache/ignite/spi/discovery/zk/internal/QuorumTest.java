@@ -499,7 +499,8 @@ public class QuorumTest extends GridCommonAbstractTest {
     /**
      * @throws Exception If failed.
      */
-    public void testSegmentationWithInner6_4() throws Exception {
+    public void ignoreTestSegmentationWithInner6_4() throws Exception {
+        //todo
         int[] order = doTestSegmentation(new T3<>(0, 1, 2), 6, 4)[0];
 
         assertTopEqualsByOrders(

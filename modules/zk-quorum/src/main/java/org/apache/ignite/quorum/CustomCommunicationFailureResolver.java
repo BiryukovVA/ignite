@@ -95,11 +95,9 @@ public class CustomCommunicationFailureResolver implements CommunicationFailureR
 
     /** {@inheritDoc} */
     @Override public void resolve(CommunicationFailureContext ctx) {
-        ClusterGraph graph = new ClusterGraph(log, ctx, cfg);
+        ClusterSearch cluster = getFutureCluster(ctx);
 
-        ClusterSearch cluster = graph.findLargestIndependentCluster();
-
-        // TODO sort by DC.
+        // TODO mb sort by DC for some cases.
         List<ClusterNode> nodes = ctx.topologySnapshot();
 
         assert nodes.size() > 0;
@@ -127,9 +125,35 @@ public class CustomCommunicationFailureResolver implements CommunicationFailureR
             if (log.isInfoEnabled())
                 log.info("Communication problem resolver failed to find fully connected independent cluster.");
 
-            for (ClusterNode node : nodes)
-                ctx.killNode(node);
+            if (cfg.isStopUnresolvedCluster()) {
+                for (ClusterNode node : nodes)
+                    ctx.killNode(node);
+            }
         }
+    }
+
+    /**
+     * @param ctx Context.
+     */
+    private ClusterSearch getFutureCluster(CommunicationFailureContext ctx) {
+        ClusterGraph graph = new ClusterGraph(log, ctx, cfg);
+
+        ClusterSearch cluster = graph.findLargestIndependentCluster();
+
+        if (cluster == null)
+            return null;
+
+        if (cfg.isDelNodesWithConnProblems()) {
+            if (graph.deleteAllNodesWithConnectionProblems(cluster).goodServersCnt() < cfg.getMinNodesCnt())
+                return null;
+
+        }
+        else {
+            if (!graph.checkFullyConnected(cluster.nodesBitSet))
+                return null;
+        }
+
+        return cluster;
     }
 
     /**
@@ -227,7 +251,7 @@ public class CustomCommunicationFailureResolver implements CommunicationFailureR
             }
 
             if (ownedParts.size() >= partCnt)
-                return  true;
+                return true;
         }
 
         SB sb = new SB("Communication problem resolver found lose partitions in cache group: '");
@@ -322,6 +346,11 @@ public class CustomCommunicationFailureResolver implements CommunicationFailureR
         private int goodServersCnt() {
             return srvCnt - srvToKillCnt;
         }
+
+        /** {@inheritDoc} */
+        @Override public ClusterSearch clone() throws CloneNotSupportedException {
+            return (ClusterSearch)super.clone();
+        }
     }
 
     /**
@@ -411,11 +440,6 @@ public class CustomCommunicationFailureResolver implements CommunicationFailureR
                 }
             }
 
-            if (maxCluster != null) {
-                if (deleteAllNodesWithConnectionProblems(maxCluster).goodServersCnt() < cfg.getMinNodesCnt())
-                    return null;
-            }
-
             return maxCluster;
         }
 
@@ -473,6 +497,49 @@ public class CustomCommunicationFailureResolver implements CommunicationFailureR
             }
 
             return cluster;
+        }
+
+        public static void main(String[] args) {
+            BitSet bitSet = new BitSet();
+
+            for (int i = 0; i < 100; i++)
+                bitSet.set(i);
+
+            System.out.println(bitSet.length());
+            System.out.println(bitSet.previousSetBit(bitSet.length() - 1));
+        }
+
+        /**
+         * @param cluster Cluster nodes bit set.
+         * @return {@code True} if all cluster nodes are able to connect to each other.
+         */
+        boolean checkFullyConnected(BitSet cluster) {
+            int startIdx = 0;
+
+            int clusterNodes = cluster.previousSetBit(cluster.length() - 1);
+
+            for (; ; ) {
+                int idx = cluster.nextSetBit(startIdx);
+
+                if (idx == -1)
+                    break;
+
+                ClusterNode node1 = nodes.get(idx);
+
+                for (int i = 0; i <= clusterNodes; i++) {
+                    if (!cluster.get(i) || i == idx)
+                        continue;
+
+                    ClusterNode node2 = nodes.get(i);
+
+                    if (cluster.get(i) && !ctx.connectionAvailable(node1, node2))
+                        return false;
+                }
+
+                startIdx = idx + 1;
+            }
+
+            return true;
         }
 
         /**
