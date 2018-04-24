@@ -148,6 +148,7 @@ import static org.apache.ignite.events.EventType.EVT_NODE_JOINED;
 import static org.apache.ignite.events.EventType.EVT_NODE_LEFT;
 import static org.apache.ignite.events.EventType.EVT_NODE_METRICS_UPDATED;
 import static org.apache.ignite.events.EventType.EVT_NODE_SEGMENTED;
+import static org.apache.ignite.events.EventType.EVT_SAFE_NODE_LEFT;
 import static org.apache.ignite.failure.FailureType.CRITICAL_ERROR;
 import static org.apache.ignite.failure.FailureType.SYSTEM_WORKER_TERMINATION;
 import static org.apache.ignite.internal.IgniteNodeAttributes.ATTR_DATA_REGIONS_OFFHEAP_SIZE;
@@ -634,11 +635,20 @@ public class GridDiscoveryManager extends GridManagerAdapter<DiscoverySpi> {
                         verChanged = false;
                 }
 
+                boolean nodeStopping = false;
+
                 if (type == EVT_NODE_FAILED || type == EVT_NODE_LEFT) {
                     for (DiscoCache c : discoCacheHist.values())
                         c.updateAlives(node);
 
                     updateClientNodes(node.id());
+                }
+                else if (type == EVT_SAFE_NODE_LEFT) {
+                    for (DiscoCache c : discoCacheHist.values())
+                        c.updateStoppingNodes(node);
+
+                    nodeStopping = true;
+                    verChanged = true;
                 }
 
                 boolean locJoinEvt = type == EVT_NODE_JOINED && node.id().equals(locNode.id());
@@ -723,14 +733,18 @@ public class GridDiscoveryManager extends GridManagerAdapter<DiscoverySpi> {
                             nextTopVer,
                             ctx.state().clusterState(),
                             locNode,
-                            topSnapshot);
+                            topSnapshot,
+                            nodeStopping ? node : null
+                        );
                     }
                     else if (customMsg instanceof ChangeGlobalStateMessage) {
                         discoCache = createDiscoCache(
                             nextTopVer,
                             ctx.state().pendingState((ChangeGlobalStateMessage)customMsg),
                             locNode,
-                            topSnapshot);
+                            topSnapshot,
+                            null
+                        );
                     }
                     else
                         discoCache = customMsg.createDiscoCache(GridDiscoveryManager.this, nextTopVer, snapshot.discoCache);
@@ -812,7 +826,7 @@ public class GridDiscoveryManager extends GridManagerAdapter<DiscoverySpi> {
 
                     topSnap.set(new Snapshot(AffinityTopologyVersion.ZERO,
                         createDiscoCache(AffinityTopologyVersion.ZERO, ctx.state().clusterState(), locNode,
-                            Collections.singleton(locNode))
+                            Collections.singleton(locNode), null)
                     ));
                 }
                 else if (type == EVT_CLIENT_NODE_RECONNECTED) {
@@ -2289,11 +2303,15 @@ public class GridDiscoveryManager extends GridManagerAdapter<DiscoverySpi> {
         AffinityTopologyVersion topVer,
         DiscoveryDataClusterState state,
         ClusterNode loc,
-        Collection<ClusterNode> topSnapshot) {
+        Collection<ClusterNode> topSnapshot,
+        @Nullable ClusterNode stoppingNode) {
         assert topSnapshot.contains(loc);
 
         HashSet<UUID> alives = U.newHashSet(topSnapshot.size());
         HashMap<UUID, ClusterNode> nodeMap = U.newHashMap(topSnapshot.size());
+
+        Set<UUID> stoppingNodes =
+            stoppingNode == null ? Collections.emptySet() : Collections.singleton(stoppingNode.id());
 
         ArrayList<ClusterNode> daemonNodes = new ArrayList<>(topSnapshot.size());
         ArrayList<ClusterNode> srvNodes = new ArrayList<>(topSnapshot.size());
@@ -2344,7 +2362,7 @@ public class GridDiscoveryManager extends GridManagerAdapter<DiscoverySpi> {
         Map<Integer, List<ClusterNode>> cacheGrpAffNodes = U.newHashMap(allNodes.size());
         Set<ClusterNode> rmtNodesWithCaches = new TreeSet<>(NodeOrderComparator.getInstance());
 
-        fillAffinityNodeCaches(allNodes, allCacheNodes, cacheGrpAffNodes, rmtNodesWithCaches);
+        fillAffinityNodeCaches(allNodes, allCacheNodes, cacheGrpAffNodes, rmtNodesWithCaches, stoppingNodes);
 
         BaselineTopology blt = state.baselineTopology();
 
@@ -2402,6 +2420,7 @@ public class GridDiscoveryManager extends GridManagerAdapter<DiscoverySpi> {
             Collections.unmodifiableMap(cacheGrpAffNodes),
             Collections.unmodifiableMap(nodeMap),
             alives,
+            stoppingNodes,
             nodeIdToConsIdx == null ? null : Collections.unmodifiableMap(nodeIdToConsIdx),
             consIdxToNodeId == null ? null : Collections.unmodifiableMap(consIdxToNodeId),
             minVer,
@@ -2563,7 +2582,8 @@ public class GridDiscoveryManager extends GridManagerAdapter<DiscoverySpi> {
                                 AffinityTopologyVersion.NONE,
                                 ctx.state().clusterState(),
                                 node,
-                                locNodeOnlyTop
+                                locNodeOnlyTop,
+                                null
                             ), locNodeOnlyTop,
                             null);
 
@@ -2636,6 +2656,9 @@ public class GridDiscoveryManager extends GridManagerAdapter<DiscoverySpi> {
 
                 else if (type == EVT_NODE_LEFT)
                     evt.message("Node left: " + node);
+
+                else if (type == EVT_SAFE_NODE_LEFT)
+                    evt.message("Node safe left: " + node);
 
                 else if (type == EVT_NODE_FAILED)
                     evt.message("Node failed: " + node);
@@ -2770,6 +2793,11 @@ public class GridDiscoveryManager extends GridManagerAdapter<DiscoverySpi> {
                     }
                     else if (log.isDebugEnabled())
                         log.debug("Daemon node left topology: " + node);
+
+                    break;
+                }
+
+                case EVT_SAFE_NODE_LEFT: {
 
                     break;
                 }
@@ -3221,31 +3249,37 @@ public class GridDiscoveryManager extends GridManagerAdapter<DiscoverySpi> {
 
     /**
      * Fills affinity node caches.
-     *
-     * @param allNodes All nodes.
+     *  @param allNodes All nodes.
      * @param allCacheNodes All cache nodes.
      * @param cacheGrpAffNodes Cache group aff nodes.
      * @param rmtNodesWithCaches Rmt nodes with caches.
+     * @param stoppingNodes
      */
     private void fillAffinityNodeCaches(List<ClusterNode> allNodes, Map<Integer, List<ClusterNode>> allCacheNodes,
-        Map<Integer, List<ClusterNode>> cacheGrpAffNodes, Set<ClusterNode> rmtNodesWithCaches) {
+        Map<Integer, List<ClusterNode>> cacheGrpAffNodes, Set<ClusterNode> rmtNodesWithCaches,
+        Set<UUID> stoppingNodes) {
         for (ClusterNode node : allNodes) {
             assert node.order() != 0 : "Invalid node order [locNode=" + localNode() + ", node=" + node + ']';
             assert !node.isDaemon();
 
-            for (Map.Entry<Integer, CacheGroupAffinity> e : registeredCacheGrps.entrySet()) {
-                CacheGroupAffinity grpAff = e.getValue();
-                Integer grpId = e.getKey();
+            if(!stoppingNodes.contains(node.id())){
+                for (Map.Entry<Integer, CacheGroupAffinity> e : registeredCacheGrps.entrySet()) {
+                    CacheGroupAffinity grpAff = e.getValue();
+                    Integer grpId = e.getKey();
 
-                if (CU.affinityNode(node, grpAff.cacheFilter)) {
-                    List<ClusterNode> nodes = cacheGrpAffNodes.get(grpId);
+                    if (CU.affinityNode(node, grpAff.cacheFilter)) {
+                        List<ClusterNode> nodes = cacheGrpAffNodes.get(grpId);
 
-                    if (nodes == null)
-                        cacheGrpAffNodes.put(grpId, nodes = new ArrayList<>());
+                        if (nodes == null)
+                            cacheGrpAffNodes.put(grpId, nodes = new ArrayList<>());
 
-                    nodes.add(node);
+                        nodes.add(node);
+                    }
                 }
+            }else {
+                System.out.println();
             }
+
 
             for (Map.Entry<String, CachePredicate> entry : registeredCaches.entrySet()) {
                 String cacheName = entry.getKey();
@@ -3277,7 +3311,7 @@ public class GridDiscoveryManager extends GridManagerAdapter<DiscoverySpi> {
         Map<Integer, List<ClusterNode>> cacheGrpAffNodes = U.newHashMap(allNodes.size());
         Set<ClusterNode> rmtNodesWithCaches = new TreeSet<>(NodeOrderComparator.getInstance());
 
-        fillAffinityNodeCaches(allNodes, allCacheNodes, cacheGrpAffNodes, rmtNodesWithCaches);
+        fillAffinityNodeCaches(allNodes, allCacheNodes, cacheGrpAffNodes, rmtNodesWithCaches, Collections.emptySet());
 
         return new DiscoCache(
             topVer,
@@ -3293,6 +3327,7 @@ public class GridDiscoveryManager extends GridManagerAdapter<DiscoverySpi> {
             cacheGrpAffNodes,
             discoCache.nodeMap,
             discoCache.alives,
+            discoCache.stoppingNodes,
             discoCache.nodeIdToConsIdx,
             discoCache.consIdxToNodeId,
             discoCache.minimumNodeVersion(),

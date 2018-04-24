@@ -138,6 +138,7 @@ import org.apache.ignite.spi.discovery.tcp.messages.TcpDiscoveryPingRequest;
 import org.apache.ignite.spi.discovery.tcp.messages.TcpDiscoveryPingResponse;
 import org.apache.ignite.spi.discovery.tcp.messages.TcpDiscoveryRedirectToClient;
 import org.apache.ignite.spi.discovery.tcp.messages.TcpDiscoveryRingLatencyCheckMessage;
+import org.apache.ignite.spi.discovery.tcp.messages.TcpDiscoverySafeNodeLeftMessage;
 import org.apache.ignite.spi.discovery.tcp.messages.TcpDiscoveryServerOnlyCustomEventMessage;
 import org.apache.ignite.spi.discovery.tcp.messages.TcpDiscoveryStatusCheckMessage;
 import org.apache.ignite.thread.IgniteThreadPoolExecutor;
@@ -153,6 +154,7 @@ import static org.apache.ignite.events.EventType.EVT_NODE_JOINED;
 import static org.apache.ignite.events.EventType.EVT_NODE_LEFT;
 import static org.apache.ignite.events.EventType.EVT_NODE_METRICS_UPDATED;
 import static org.apache.ignite.events.EventType.EVT_NODE_SEGMENTED;
+import static org.apache.ignite.events.EventType.EVT_SAFE_NODE_LEFT;
 import static org.apache.ignite.failure.FailureType.CRITICAL_ERROR;
 import static org.apache.ignite.failure.FailureType.SYSTEM_WORKER_TERMINATION;
 import static org.apache.ignite.internal.IgniteNodeAttributes.ATTR_LATE_AFFINITY_ASSIGNMENT;
@@ -178,7 +180,7 @@ import static org.apache.ignite.spi.discovery.tcp.messages.TcpDiscoveryStatusChe
 /**
  *
  */
-class ServerImpl extends TcpDiscoveryImpl {
+public class ServerImpl extends TcpDiscoveryImpl {
     /** */
     private static final int ENSURED_MSG_HIST_SIZE = getInteger(IGNITE_DISCOVERY_CLIENT_RECONNECT_HISTORY_SIZE, 512);
 
@@ -392,6 +394,8 @@ class ServerImpl extends TcpDiscoveryImpl {
         spiStop0(false);
     }
 
+
+    private volatile boolean qwe;
     /**
      * Stops SPI finally or stops SPI for restart.
      *
@@ -412,10 +416,12 @@ class ServerImpl extends TcpDiscoveryImpl {
             }
         }
 
-        if (msgWorker != null && msgWorker.isAlive() && !disconnect) {
+        if (!qwe && msgWorker != null && msgWorker.isAlive() && !disconnect) {
             // Send node left message only if it is final stop.
             msgWorker.addMessage(new TcpDiscoveryNodeLeftMessage(locNode.id()));
 
+
+            qwe = true;
             synchronized (mux) {
                 long timeout = spi.netTimeout;
 
@@ -828,6 +834,13 @@ class ServerImpl extends TcpDiscoveryImpl {
 
             msgWorker.addMessage(msg);
         }
+    }
+
+    /**
+     *
+     */
+    public void safeStopNode() {
+        msgWorker.addMessage(new TcpDiscoverySafeNodeLeftMessage(getLocalNodeId()));
     }
 
     /** {@inheritDoc} */
@@ -2165,6 +2178,7 @@ class ServerImpl extends TcpDiscoveryImpl {
                     }
                 }
             }
+            //todo
             else if (msg instanceof TcpDiscoveryNodeLeftMessage)
                 clearClientAddFinished(msg.creatorNodeId());
             else if (msg instanceof TcpDiscoveryNodeFailedMessage)
@@ -2748,6 +2762,9 @@ class ServerImpl extends TcpDiscoveryImpl {
 
             else if (msg instanceof TcpDiscoveryNodeLeftMessage)
                 processNodeLeftMessage((TcpDiscoveryNodeLeftMessage)msg);
+
+            else if (msg instanceof TcpDiscoverySafeNodeLeftMessage)
+                processSafeNodeLeftMessage((TcpDiscoverySafeNodeLeftMessage)msg);
 
             else if (msg instanceof TcpDiscoveryNodeFailedMessage)
                 processNodeFailedMessage((TcpDiscoveryNodeFailedMessage)msg);
@@ -4704,6 +4721,214 @@ class ServerImpl extends TcpDiscoveryImpl {
             else {
                 forceSndPending = false;
 
+                if (log.isDebugEnabled())
+                    log.debug("Unable to send message across the ring (topology has no remote nodes): " + msg);
+
+                U.closeQuiet(sock);
+            }
+
+            checkPendingCustomMessages();
+        }
+
+        /**
+         * @param msg Message.
+         */
+        private void processSafeNodeLeftMessage(TcpDiscoverySafeNodeLeftMessage msg) {
+            System.out.println("wwwwwwwwwwwwwwwwwwwww" + locNode.id());
+           /* assert msg != null;
+
+            UUID locNodeId = getLocalNodeId();
+
+            UUID leavingNodeId = msg.creatorNodeId();
+
+
+            if (msg.senderNodeId() != null && ring.node(msg.senderNodeId()) == null) {
+                if (log.isDebugEnabled())
+                    log.debug("Discarding safe node left message since sender node is not in topology: " + msg);
+
+                return;
+            }
+
+
+
+//            boolean locNodeCoord = isLocalNodeCoordinator();
+
+
+
+            if (msg.verified() && !locNodeId.equals(leavingNodeId)) {
+
+                long topVer;
+                    topVer = msg.topologyVersion();
+
+                    assert topVer > 0 : "Topology version is empty for message: " + msg;
+
+                    boolean b = ring.topologyVersion(topVer);
+
+                    assert b : "Topology version has not been updated: [ring=" + ring + ", msg=" + msg +
+                        ", lastMsg=" + lastMsg + ", spiState=" + spiStateCopy() + ']';
+
+                    if (log.isDebugEnabled())
+                        log.debug("Topology version has been updated: [ring=" + ring + ", msg=" + msg + ']');
+
+                    lastMsg = msg;
+/
+
+                synchronized (mux) {
+                    joiningNodes.remove(leavingNodeId);
+                }
+
+//                spi.stats.onNodeLeft();
+
+                TcpDiscoveryNode leftNode = ring.node(leavingNodeId);
+
+
+                notifyDiscovery(EVT_SAFE_NODE_LEFT, topVer, leftNode);
+
+                *//*synchronized (mux) {
+                    failedNodes.remove(leftNode);
+
+                    leavingNodes.remove(leftNode);
+
+                    failedNodesMsgSent.remove(leftNode.id());
+                }*//*
+            }
+
+            if (sendMessageToRemotes(msg)) {
+                try {
+                    sendMessageAcrossRing(msg);
+                }
+                finally {
+                    forceSndPending = false;
+                }
+            }
+            else {
+                forceSndPending = false;
+
+                if (log.isDebugEnabled())
+                    log.debug("Unable to send message across the ring (topology has no remote nodes): " + msg);
+
+                U.closeQuiet(sock);
+            }
+
+            checkPendingCustomMessages();
+
+
+            */
+
+            /////////////////////////////////////
+
+            assert msg != null;
+
+            UUID sndId = msg.senderNodeId();
+
+            if (sndId != null) {
+                TcpDiscoveryNode sndNode = ring.node(sndId);
+
+                if (sndNode == null) {
+                    if (log.isDebugEnabled())
+                        log.debug("Discarding node failed message sent from unknown node: " + msg);
+
+                    return;
+                }
+                else {
+                    boolean contains;
+
+                    //todo
+                   /* UUID creatorId = msg.creatorNodeId();
+
+                    assert creatorId != null : msg;
+
+                    synchronized (mux) {
+                        contains = failedNodes.containsKey(sndNode) || ring.node(creatorId) == null;
+                    }
+
+                    if (contains) {
+                        if (log.isDebugEnabled())
+                            log.debug("Discarding node failed message sent from node which is about to fail: " + msg);
+
+                        return;
+                    }*/
+                }
+            }
+
+            UUID stoppingNodeId = msg.creatorNodeId();
+
+
+            TcpDiscoveryNode stoppingNode = ring.node(stoppingNodeId);
+
+
+            if (stoppingNode != null) {
+//                assert !msg.verified() : msg;
+
+//                boolean skipUpdateFailedNodes = msg.force() && !msg.verified();
+
+                /*if (!skipUpdateFailedNodes) {
+                    synchronized (mux) {
+                        if (!failedNodes.containsKey(failedNode))
+                            failedNodes.put(failedNode, msg.senderNodeId() != null ? msg.senderNodeId() : getLocalNodeId());
+                    }
+                }*/
+            }
+            else {
+                if (log.isDebugEnabled())
+                    log.debug("Discarding node failed message since node was not found: " + msg);
+
+                return;
+            }
+
+            boolean locNodeCoord = isLocalNodeCoordinator();
+
+            UUID locNodeId = getLocalNodeId();
+
+            if (locNodeCoord) {
+                if (msg.verified()) {
+                    spi.stats.onRingMessageReceived(msg);
+
+                    addMessage(new TcpDiscoveryDiscardMessage(locNodeId, msg.id(), false));
+
+                    return;
+                }
+
+                msg.verify(locNodeId);
+            }
+
+            if (msg.verified()) {
+                long topVer;
+
+                if (locNodeCoord) {
+                    topVer = ring.incrementTopologyVersion();
+
+                    msg.topologyVersion(topVer);
+                }
+                else {
+                    topVer = msg.topologyVersion();
+
+                    assert topVer > 0 : "Topology version is empty for message: " + msg;
+
+                    boolean b = ring.topologyVersion(topVer);
+
+                    assert b : "Topology version has not been updated: [ring=" + ring + ", msg=" + msg +
+                        ", lastMsg=" + lastMsg + ", spiState=" + spiStateCopy() + ']';
+
+                    if (log.isDebugEnabled())
+                        log.debug("Topology version has been updated: [ring=" + ring + ", msg=" + msg + ']');
+
+                    lastMsg = msg;
+                }
+
+
+                synchronized (mux) {
+                    joiningNodes.remove(stoppingNodeId);
+                }
+
+                notifyDiscovery(EVT_SAFE_NODE_LEFT, topVer, stoppingNode);
+
+//                spi.stats.onNodeFailed();
+            }
+
+            if (sendMessageToRemotes(msg))
+                sendMessageAcrossRing(msg);
+            else {
                 if (log.isDebugEnabled())
                     log.debug("Unable to send message across the ring (topology has no remote nodes): " + msg);
 

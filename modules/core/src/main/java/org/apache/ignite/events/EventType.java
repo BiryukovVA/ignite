@@ -123,6 +123,16 @@ public interface EventType {
     public static final int EVT_NODE_LEFT = 11;
 
     /**
+     * Built-in event type: node has normally left topology.
+     * <p>
+     * NOTE: all types in range <b>from 1 to 1000 are reserved</b> for
+     * internal Ignite events and should not be used by user-defined events.
+     *
+     * @see DiscoveryEvent
+     */
+    public static final int EVT_SAFE_NODE_LEFT = 666;
+
+    /**
      * Built-in event type: node failed.
      * <br>
      * Ignite detected that node has presumably crashed and is considered failed.

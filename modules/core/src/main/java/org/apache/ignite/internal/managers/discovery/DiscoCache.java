@@ -87,6 +87,9 @@ public class DiscoCache {
     /** Alive nodes. */
     final Set<UUID> alives = new GridConcurrentHashSet<>();
 
+    /** Stopping nodes. */
+    final Set<UUID> stoppingNodes = new GridConcurrentHashSet<>();
+
     /** Minimum {@link IgniteProductVersion} across all nodes including client nodes. */
     private final IgniteProductVersion minNodeVer;
 
@@ -140,6 +143,7 @@ public class DiscoCache {
         Map<Integer, List<ClusterNode>> cacheGrpAffNodes,
         Map<UUID, ClusterNode> nodeMap,
         Set<UUID> alives0,
+        Set<UUID> stoppingNodes0,
         @Nullable Map<UUID, Short> nodeIdToConsIdx,
         @Nullable  Map<Short, UUID> consIdxToNodeId,
         IgniteProductVersion minNodeVer,
@@ -158,6 +162,7 @@ public class DiscoCache {
         this.cacheGrpAffNodes = cacheGrpAffNodes;
         this.nodeMap = nodeMap;
         alives.addAll(alives0);
+        stoppingNodes.addAll(stoppingNodes0);
         this.minNodeVer = minNodeVer;
         this.minSrvNodeVer = minSrvNodeVer;
         this.nodeIdToConsIdx = nodeIdToConsIdx;
@@ -371,9 +376,18 @@ public class DiscoCache {
      */
     public void updateAlives(GridDiscoveryManager discovery) {
         for (UUID alive : alives) {
-            if (!discovery.alive(alive))
+            if (!discovery.alive(alive)){
                 alives.remove(alive);
+                stoppingNodes.remove(alive);
+            }
         }
+    }
+
+    /**
+     * @param rmvd Rmvd.
+     */
+    public void updateStoppingNodes(ClusterNode rmvd){
+        stoppingNodes.add(rmvd.id());
     }
 
     /**
@@ -443,6 +457,7 @@ public class DiscoCache {
             cacheGrpAffNodes,
             nodeMap,
             alives,
+            stoppingNodes,
             nodeIdToConsIdx,
             consIdxToNodeId,
             minNodeVer,
