@@ -232,6 +232,11 @@ abstract class TcpDiscoveryImpl {
     public abstract void failNode(UUID nodeId, @Nullable String warning);
 
     /**
+     *
+     */
+    public abstract void evictPartitions();
+
+    /**
      * Dumps ring structure to logger.
      *
      * @param log Logger.

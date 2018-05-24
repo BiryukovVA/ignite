@@ -19,6 +19,7 @@ package org.apache.ignite.configuration;
 
 import java.io.Serializable;
 import javax.cache.configuration.Factory;
+import org.apache.ignite.Ignition;
 import org.apache.ignite.internal.util.typedef.internal.S;
 import org.apache.ignite.transactions.Transaction;
 import org.apache.ignite.transactions.TransactionConcurrency;
@@ -49,6 +50,9 @@ public class TransactionConfiguration implements Serializable {
     /** Default size of pessimistic transactions log. */
     public static final int DFLT_PESSIMISTIC_TX_LOG_LINGER = 10_000;
 
+    /** Default timeout for waiting transactions on grid stop. */
+    public static final long DFLT_TX_ON_STOP_TIMEOUT = 30_000;
+
     /** Default transaction serializable flag. */
     private boolean txSerEnabled = DFLT_TX_SERIALIZABLE_ENABLED;
 
@@ -69,6 +73,9 @@ public class TransactionConfiguration implements Serializable {
 
     /** Pessimistic tx log linger. */
     private int pessimisticTxLogLinger = DFLT_PESSIMISTIC_TX_LOG_LINGER;
+
+    /** Timeout for waiting transactions on grid stop. */
+    private long txOnStopTimeout = DFLT_TX_ON_STOP_TIMEOUT;
 
     /** Name of class implementing GridCacheTmLookup. */
     private String tmLookupClsName;
@@ -103,6 +110,7 @@ public class TransactionConfiguration implements Serializable {
         tmLookupClsName = cfg.getTxManagerLookupClassName();
         txManagerFactory = cfg.getTxManagerFactory();
         useJtaSync = cfg.isUseJtaSynchronization();
+        txOnStopTimeout = cfg.getTxOnStopTimeout();
     }
 
     /**
@@ -280,6 +288,29 @@ public class TransactionConfiguration implements Serializable {
         this.pessimisticTxLogLinger = pessimisticTxLogLinger;
 
         return this;
+    }
+
+    /**
+     * Gets timeout, in milliseconds, for waiting transactions completion in {@link Ignition#stop(boolean)}
+     * method with {@code false} parameter before stopping the grid.
+     * <p>
+     * If not set, default value is {@link #DFLT_TX_ON_STOP_TIMEOUT}.
+     * </p>
+     *
+     * @return Timeout for waiting transactions on grid stop.
+     */
+    public long getTxOnStopTimeout() {
+        return txOnStopTimeout;
+    }
+
+    /**
+     * Sets timeout for waiting transactions completion in {@link Ignition#stop(boolean)}
+     * method with {@code false} parameter before stopping the grid, in milliseconds.
+     *
+     * @param txOnStopTimeout New timeout for waiting transactions on grid stop.
+     */
+    public void setTxOnStopTimeout(long txOnStopTimeout) {
+        this.txOnStopTimeout = txOnStopTimeout;
     }
 
     /**

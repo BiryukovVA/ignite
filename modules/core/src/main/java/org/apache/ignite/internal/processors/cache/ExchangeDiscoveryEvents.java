@@ -35,6 +35,7 @@ import org.apache.ignite.internal.util.typedef.internal.U;
 import static org.apache.ignite.events.EventType.EVT_NODE_FAILED;
 import static org.apache.ignite.events.EventType.EVT_NODE_JOINED;
 import static org.apache.ignite.events.EventType.EVT_NODE_LEFT;
+import static org.apache.ignite.events.EventType.EVT_NODE_PARTITIONS_EVICTION;
 import static org.apache.ignite.internal.events.DiscoveryCustomEvent.EVT_DISCOVERY_CUSTOM_EVT;
 
 /**
@@ -78,7 +79,8 @@ public class ExchangeDiscoveryEvents {
      */
     public void processEvents(GridDhtPartitionsExchangeFuture fut) {
         for (DiscoveryEvent evt : evts) {
-            if (evt.type() == EVT_NODE_LEFT || evt.type() == EVT_NODE_FAILED)
+            if (evt.type() == EVT_NODE_LEFT || evt.type() == EVT_NODE_FAILED
+                || evt.type() == EVT_NODE_PARTITIONS_EVICTION)
                 fut.sharedContext().mvcc().removeExplicitNodeLocks(evt.eventNode().id(), fut.initialVersion());
         }
 
@@ -133,7 +135,8 @@ public class ExchangeDiscoveryEvents {
 
             if (evt.type()== EVT_NODE_JOINED)
                 srvJoin = true;
-            else if (evt.type() == EVT_NODE_LEFT || evt.type() == EVT_NODE_FAILED)
+            else if (evt.type() == EVT_NODE_LEFT || evt.type() == EVT_NODE_FAILED
+                || evt.type() == EVT_NODE_PARTITIONS_EVICTION)
                 srvLeft = !node.isClient();
         }
     }
@@ -150,7 +153,8 @@ public class ExchangeDiscoveryEvents {
      * @return {@code True} if given event is {@link EventType#EVT_NODE_FAILED} or {@link EventType#EVT_NODE_LEFT}.
      */
     public static boolean serverLeftEvent(DiscoveryEvent evt) {
-        return  ((evt.type() == EVT_NODE_FAILED || evt.type() == EVT_NODE_LEFT) && !evt.eventNode().isClient());
+        return  ((evt.type() == EVT_NODE_FAILED || evt.type() == EVT_NODE_LEFT
+            || evt.type() == EVT_NODE_PARTITIONS_EVICTION) && !evt.eventNode().isClient());
     }
 
     /**

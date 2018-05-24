@@ -95,12 +95,17 @@ import org.apache.ignite.configuration.DataStorageConfiguration;
 import org.apache.ignite.configuration.IgniteConfiguration;
 import org.apache.ignite.configuration.MemoryConfiguration;
 import org.apache.ignite.configuration.NearCacheConfiguration;
+import org.apache.ignite.configuration.TransactionConfiguration;
 import org.apache.ignite.events.EventType;
 import org.apache.ignite.internal.binary.BinaryEnumCache;
 import org.apache.ignite.internal.binary.BinaryMarshaller;
 import org.apache.ignite.internal.binary.BinaryUtils;
 import org.apache.ignite.internal.cluster.ClusterGroupAdapter;
 import org.apache.ignite.internal.cluster.IgniteClusterEx;
+import org.apache.ignite.internal.managers.eventstorage.DiscoveryEventListener;
+import org.apache.ignite.internal.processors.affinity.AffinityTopologyVersion;
+import org.apache.ignite.internal.processors.cluster.DiscoveryDataClusterState;
+import org.apache.ignite.internal.processors.failure.FailureProcessor;
 import org.apache.ignite.internal.managers.GridManager;
 import org.apache.ignite.internal.managers.checkpoint.GridCheckpointManager;
 import org.apache.ignite.internal.managers.collision.GridCollisionManager;
@@ -222,7 +227,9 @@ import static org.apache.ignite.IgniteSystemProperties.IGNITE_STARVATION_CHECK_I
 import static org.apache.ignite.IgniteSystemProperties.IGNITE_SUCCESS_FILE;
 import static org.apache.ignite.IgniteSystemProperties.getBoolean;
 import static org.apache.ignite.IgniteSystemProperties.snapshot;
+import static org.apache.ignite.events.EventType.EVT_NODE_PARTITIONS_EVICTION;
 import static org.apache.ignite.internal.GridKernalState.DISCONNECTED;
+import static org.apache.ignite.internal.GridKernalState.PRE_STOPPING;
 import static org.apache.ignite.internal.GridKernalState.STARTED;
 import static org.apache.ignite.internal.GridKernalState.STARTING;
 import static org.apache.ignite.internal.GridKernalState.STOPPED;
@@ -2121,6 +2128,68 @@ public class IgniteKernal implements IgniteEx, IgniteMXBean, Externalizable {
                 notifyLifecycleBeansEx(LifecycleEventType.BEFORE_NODE_STOP);
             }
 
+            TransactionConfiguration txCfg = CU.transactionConfiguration(null, ctx.config());
+
+            long txOnStopTimeout = txCfg.getTxOnStopTimeout();
+
+            if (!cancel && txOnStopTimeout > 0 && state == STARTED) {
+                gw.setState(PRE_STOPPING);
+
+                IgniteInternalFuture<Boolean> fut = ctx.cache().context().tm().finishNearLocalTxs(null);
+
+                try {
+                    fut.get(txOnStopTimeout);
+                }
+                catch (Throwable e) {
+                    U.error(log, "Failed to wait Transactions completion: ", e);
+
+                    if (e instanceof Error)
+                        throw (Error)e;
+                }
+
+                if (!ctx.clientNode()) {
+                    GridFutureAdapter<AffinityTopologyVersion> evictionStartedFut = new GridFutureAdapter<>();
+
+                    DiscoveryEventListener lsnr = (evt, discoCache) -> {
+                        if (evt.eventNode().isLocal()) {
+                            AffinityTopologyVersion ver = discoCache.version();
+                            evictionStartedFut.onDone(ver);
+                        }
+
+                    };
+
+                    AffinityTopologyVersion topVer = null;
+
+                    try {
+                        ctx.event().addDiscoveryEventListener(lsnr, EVT_NODE_PARTITIONS_EVICTION);
+
+                        ctx.config().getDiscoverySpi().evictPartitions();
+
+                        topVer = evictionStartedFut.get(txOnStopTimeout);
+                    }
+                    catch (IgniteCheckedException e) {
+                        U.error(log, "Failed to wait EVT_NODE_PARTITIONS_EVICTION on grid stop: ", e);
+                    }
+                    finally {
+                        ctx.event().removeDiscoveryEventListener(lsnr);
+                    }
+
+                    assert topVer != null;
+
+                    IgniteInternalFuture<?> affinityReadyFut = ctx.cache().context().exchange().affinityReadyFuture(topVer);
+
+                    assert affinityReadyFut != null;
+
+                    try {
+                        affinityReadyFut.get(txOnStopTimeout);
+                    }
+                    catch (IgniteCheckedException e) {
+                        U.error(log, "Failed to wait affinity on grid stop: ", e);
+                    }
+                }
+
+            }
+
             List<GridComponent> comps = ctx.components();
 
             // Callback component in reverse order while kernal is still functional
@@ -2172,7 +2241,8 @@ public class IgniteKernal implements IgniteEx, IgniteMXBean, Externalizable {
                 Thread.currentThread().interrupt();
 
             try {
-                assert gw.getState() == STARTED || gw.getState() == STARTING || gw.getState() == DISCONNECTED;
+                assert gw.getState() == STARTED || gw.getState() == STARTING || gw.getState() == DISCONNECTED
+                    || gw.getState() == PRE_STOPPING;
 
                 // No more kernal calls from this point on.
                 gw.setState(STOPPING);
