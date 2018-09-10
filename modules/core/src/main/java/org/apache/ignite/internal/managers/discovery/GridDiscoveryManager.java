@@ -644,19 +644,19 @@ public class GridDiscoveryManager extends GridManagerAdapter<DiscoverySpi> {
                     updateClientNodes(node.id());
                 }
 
+                //todo
 
                 if (type == EVT_NODE_FAILED || type == EVT_NODE_LEFT || type == EVT_NODE_JOINED) {
                     for (DiscoCache c : discoCacheHist.values())
                         c.evictingNodes().remove(node);
                 }
 
-                ClusterNode evictingNode = null;
+//                ClusterNode evictingNode = null;
 
                 if (type == EVT_NODE_PARTITIONS_EVICTION) {
                     for (DiscoCache c : discoCacheHist.values())
                         c.updateEvictingNodes(node);
-
-                    evictingNode = node;
+//                    evictingNode = node;
                 }
 
                 boolean locJoinEvt = type == EVT_NODE_JOINED && node.id().equals(locNode.id());
@@ -745,16 +745,14 @@ public class GridDiscoveryManager extends GridManagerAdapter<DiscoverySpi> {
                             nextTopVer,
                             ctx.state().clusterState(),
                             locNode,
-                            topSnapshot,
-                            evictingNode);
+                            topSnapshot);
                     }
                     else if (customMsg instanceof ChangeGlobalStateMessage) {
                         discoCache = createDiscoCache(
                             nextTopVer,
                             ctx.state().pendingState((ChangeGlobalStateMessage)customMsg),
                             locNode,
-                            topSnapshot,
-                            null);
+                            topSnapshot);
                     }
                     else
                         discoCache = customMsg.createDiscoCache(GridDiscoveryManager.this, nextTopVer, snapshot.discoCache);
@@ -836,7 +834,7 @@ public class GridDiscoveryManager extends GridManagerAdapter<DiscoverySpi> {
 
                     topSnap.set(new Snapshot(AffinityTopologyVersion.ZERO,
                         createDiscoCache(AffinityTopologyVersion.ZERO, ctx.state().clusterState(), locNode,
-                            Collections.singleton(locNode), null)
+                            Collections.singleton(locNode))
                     ));
                 }
                 else if (type == EVT_CLIENT_NODE_RECONNECTED) {
@@ -1745,6 +1743,14 @@ public class GridDiscoveryManager extends GridManagerAdapter<DiscoverySpi> {
     }
 
     /**
+     *todo
+     */
+    @Nullable public Set<ClusterNode> evictedNodes() {
+        return getSpi().evictedNodes();
+    }
+
+
+    /**
      * @param node Node.
      * @return {@code True} if node is alive.
      */
@@ -2367,15 +2373,13 @@ public class GridDiscoveryManager extends GridManagerAdapter<DiscoverySpi> {
         AffinityTopologyVersion topVer,
         DiscoveryDataClusterState state,
         ClusterNode loc,
-        Collection<ClusterNode> topSnapshot,
-        @Nullable ClusterNode evictingNode) {
+        Collection<ClusterNode> topSnapshot) {
         assert topSnapshot.contains(loc);
 
         HashSet<UUID> alives = U.newHashSet(topSnapshot.size());
         HashMap<UUID, ClusterNode> nodeMap = U.newHashMap(topSnapshot.size());
 
-        Set<ClusterNode> evictingNodes =
-            evictingNode == null ? Collections.emptySet() : Collections.singleton(evictingNode);
+        Set<ClusterNode> evictingNodes = evictedNodes();
 
         ArrayList<ClusterNode> daemonNodes = new ArrayList<>(topSnapshot.size());
         ArrayList<ClusterNode> srvNodes = new ArrayList<>(topSnapshot.size());
@@ -2652,8 +2656,7 @@ public class GridDiscoveryManager extends GridManagerAdapter<DiscoverySpi> {
                                 AffinityTopologyVersion.NONE,
                                 ctx.state().clusterState(),
                                 node,
-                                locNodeOnlyTop,
-                                null
+                                locNodeOnlyTop
                             ), locNodeOnlyTop,
                             null);
 

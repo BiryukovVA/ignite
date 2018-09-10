@@ -25,6 +25,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.apache.curator.utils.PathUtils;
 import org.apache.ignite.IgniteLogger;
@@ -422,6 +423,11 @@ public class ZookeeperDiscoverySpi extends IgniteSpiAdapter implements IgniteDis
     /** {@inheritDoc} */
     @Override public void evictPartitions() {
         //todo
+    }
+
+    /** {@inheritDoc} */
+    @Override public Set<ClusterNode> evictedNodes() {
+        return null;
     }
 
     /** {@inheritDoc} */
